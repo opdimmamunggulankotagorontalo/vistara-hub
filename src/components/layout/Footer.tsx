@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Mail, MapPin, Heart } from 'lucide-react';
-import { InstagramIcon, YoutubeIcon } from '../ui/Icons';
+import { InstagramIcon } from '../ui/Icons';
 import { navItems } from '../../data';
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -38,8 +38,8 @@ export default function Footer() {
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               {[
                 { icon: <InstagramIcon size={16} />, label: 'Instagram OPDIM VISTARA', href: '#' },
-                { icon: <YoutubeIcon size={16} />, label: 'YouTube OPDIM VISTARA', href: '#' },
-                { icon: <Mail size={16} />, label: 'Email OPDIM', href: 'mailto:opdim.vistara@mamunggulan.sch.id' },
+                { icon: <span style={{ fontSize: '14px', lineHeight: 1 }}>💬</span>, label: 'WhatsApp OPDIM', href: 'https://wa.me/opdimmamunggulankotagorontalo' },
+                { icon: <Mail size={16} />, label: 'Email OPDIM', href: 'mailto:opdimmamunggulankotagorontalo@gmail.com' },
               ].map((social) => (
                 <a
                   key={social.label}
@@ -124,19 +124,19 @@ export default function Footer() {
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.625rem' }}>
                 <MapPin size={14} style={{ color: 'var(--soft-lilac)', flexShrink: 0, marginTop: '2px' }} />
                 <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
-                  Madrasah Aliyah Muhammadiyah Unggulan,<br />
-                  Kota Gorontalo, Gorontalo
+                  Jl. K. H. Ahmad Dahlan No.1, Limba U I,<br />
+                  Kota Gorontalo, Gorontalo 96135
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
                 <Mail size={14} style={{ color: 'var(--soft-lilac)', flexShrink: 0 }} />
                 <a
-                  href="mailto:opdim.vistara@mamunggulan.sch.id"
+                  href="mailto:opdimmamunggulankotagorontalo@gmail.com"
                   style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--soft-lilac)'; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)'; }}
                 >
-                  opdim.vistara@mamunggulan.sch.id
+                  opdimmamunggulankotagorontalo@gmail.com
                 </a>
               </div>
             </div>

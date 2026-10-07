@@ -7,12 +7,12 @@ import { komisiData } from '../../data';
 const visiMisi = {
   visi: 'Terwujudnya pelajar MAM Unggulan Kota Gorontalo yang beriman, berilmu, berakhlak mulia, berjiwa kepemimpinan, unggul berprestasi, cakap literasi-teknologi, dan peduli sesama serta lingkungan.',
   misi: [
-    'Membina iman, ibadah, dan nilai-nilai Kemuhammadiyahan yang kuat.',
-    'Mengembangkan jiwa kepemimpinan, musyawarah, dan integritas organisasi.',
-    'Mendorong prestasi akademik, riset, dan penalaran ilmiah.',
-    'Memupuk kreativitas, seni, inovasi digital, dan budaya olahraga sehat.',
-    'Menumbuhkan empati sosial, kepedulian lingkungan, dan semangat gotong royong.',
-    'Membangun kemitraan dengan alumni, instansi, dan lembaga eksternal.',
+    'Membina iman, ibadah, dan nilai-nilai Kemuhammadiyahan yang kokoh sebagai pondasi gerak organisasi.',
+    'Mengembangkan jiwa kepemimpinan, budaya musyawarah, dan integritas organisasi yang tinggi.',
+    'Mendorong prestasi akademik, riset ilmiah, dan penalaran kritis peserta didik.',
+    'Menumbuhkan literasi, seni, inovasi digital, dan kreativitas sebagai daya ungkit kemajuan.',
+    'Memupuk empati sosial, kepedulian lingkungan, dan semangat gotong royong antarwarga madrasah.',
+    'Membangun kemitraan strategis bersama alumni, instansi, dan lembaga eksternal atas izin Kepala Madrasah.',
   ],
 };
 
@@ -150,7 +150,7 @@ export default function TentangPage() {
             label="Struktur Organisasi"
             title="5 Komisi"
             highlight="VISTARA"
-            subtitle="Lima komisi pelaksana yang menggerakkan program kerja OPDIM sepanjang periode 2026–2027."
+            subtitle="Lima komisi pelaksana yang menggerakkan program kerja OPDIM: Keagamaan, Kepemimpinan, Akademik, Aspirasi Siswa, dan Humas & Media Digital."
           />
           <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.25rem' }}>
             {komisiData.map((komisi) => (

@@ -7,7 +7,7 @@ import {
   Send,
   CheckCircle2,
 } from 'lucide-react';
-import { InstagramIcon, YoutubeIcon } from '../../components/ui/Icons';
+import { InstagramIcon } from '../../components/ui/Icons';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Badge } from '../../components/ui';
 
@@ -102,7 +102,7 @@ export default function Kontak() {
                         Alamat
                       </div>
                       <div style={{ color: 'var(--charcoal)', fontSize: '0.92rem', lineHeight: 1.5 }}>
-                        Gedung Pusat Madrasah Aliyah Muhammadiyah Unggulan Kota Gorontalo, Lantai 2, Ruang OPDIM VISTARA.
+                        Jl. K. H. Ahmad Dahlan No.1, Limba U I, Kota Selatan, Kota Gorontalo, Gorontalo 96135
                       </div>
                     </div>
                   </div>
@@ -128,10 +128,10 @@ export default function Kontak() {
                         Email Resmi
                       </div>
                       <a
-                        href="mailto:opdim.vistara@mamunggulan.sch.id"
+                        href="mailto:opdimmamunggulankotagorontalo@gmail.com"
                         style={{ color: 'var(--royal-purple)', fontSize: '0.92rem', textDecoration: 'none', fontWeight: 600 }}
                       >
-                        opdim.vistara@mamunggulan.sch.id
+                        opdimmamunggulankotagorontalo@gmail.com
                       </a>
                     </div>
                   </div>
@@ -204,7 +204,7 @@ export default function Kontak() {
                   </a>
 
                   <a
-                    href="https://youtube.com"
+                    href="https://wa.me/opdimmamunggulankotagorontalo"
                     target="_blank"
                     rel="noreferrer"
                     style={{
@@ -220,8 +220,8 @@ export default function Kontak() {
                       textDecoration: 'none',
                     }}
                   >
-                    <YoutubeIcon size={16} />
-                    <span>YouTube</span>
+                    <span style={{ fontSize: '16px' }}>💬</span>
+                    <span>WhatsApp</span>
                   </a>
                 </div>
               </div>
