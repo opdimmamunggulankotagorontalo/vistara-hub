@@ -19,12 +19,42 @@ export interface ProgramKerja {
   thumbnail?: string;
   timeline: string;
   targetOutput: string;
-  frekuensi?: 'Harian' | 'Mingguan' | 'Bulanan' | 'Tahunan' | 'Insidental';
+  // Extended official properties
+  frekuensi?: string;
+  kategoriProker?: 'Siklus' | 'Komisi 1' | 'Komisi 2' | 'Komisi 3' | 'Komisi 4' | 'Komisi 5';
   tujuan?: string;
-  misiMingguan?: { minggu: string; tema: string; deskripsi?: string }[];
+  fungsi?: string;
+  bentukKegiatan?: string[];
   mekanisme?: string[];
-  pic?: string;
+  manfaat?: string[];
+  pj?: string;
+  catatan?: string;
+  indikatorKunci?: string;
+  outputKonkret?: string[];
 }
+
+export interface VisiMisiOfficial {
+  visi: {
+    teks: string;
+    artinya: string;
+  };
+  misi: {
+    nomor: number;
+    poin: string;
+    artinya: string;
+  }[];
+}
+
+export interface ProkerSiklusItem {
+  id: string;
+  judul: string;
+  frekuensi: 'Harian' | 'Mingguan' | 'Bulanan' | 'Tahunan';
+  icon: string;
+  artinya: string;
+  pelaksana: string;
+  slug: string;
+}
+
 
 export interface BeritaItem {
   id: string;
@@ -91,6 +121,9 @@ export interface KomisiInfo {
   color: string;
   icon: string;
   description: string;
+  tagline?: string;
+  ketua?: string;
+  anggota?: string[];
 }
 
 export interface AspirastiForm {

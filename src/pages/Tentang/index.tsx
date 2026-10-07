@@ -1,20 +1,8 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, Target, Eye, Zap } from 'lucide-react';
+import { ArrowRight, Target, Zap, UserCheck } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { SectionHeading } from '../../components/ui';
-import { komisiData } from '../../data';
-
-const visiMisi = {
-  visi: 'Terwujudnya pelajar MAM Unggulan Kota Gorontalo yang beriman, berilmu, berakhlak mulia, berjiwa kepemimpinan, unggul berprestasi, cakap literasi-teknologi, dan peduli sesama serta lingkungan.',
-  misi: [
-    'Membina iman, ibadah, dan nilai-nilai Kemuhammadiyahan yang kokoh sebagai pondasi gerak organisasi.',
-    'Mengembangkan jiwa kepemimpinan, budaya musyawarah, dan integritas organisasi yang tinggi.',
-    'Mendorong prestasi akademik, riset ilmiah, dan penalaran kritis peserta didik.',
-    'Menumbuhkan literasi, seni, inovasi digital, dan kreativitas sebagai daya ungkit kemajuan.',
-    'Memupuk empati sosial, kepedulian lingkungan, dan semangat gotong royong antarwarga madrasah.',
-    'Membangun kemitraan strategis bersama alumni, instansi, dan lembaga eksternal atas izin Kepala Madrasah.',
-  ],
-};
+import { komisiData, visiMisiOfficial, prokerSiklusData } from '../../data';
 
 const tiga_pilar = [
   { num: '01', title: 'SATU TITIK', subtitle: 'Fokus & Keberanian Memilih', desc: 'Setiap transformasi besar bermula dari satu titik tolak: satu suara, satu niat tulus, satu gagasan yang diperjuangkan dengan kesungguhan.', color: 'var(--deep-violet)' },
@@ -27,7 +15,7 @@ export default function TentangPage() {
     <div>
       <PageHeader
         title="Tentang OPDIM VISTARA"
-        subtitle="Mengenal OPDIM — organisasi, identitas periode VISTARA, mascot TARA, dan visi besar yang kami emban bersama."
+        subtitle="Mengenal OPDIM — organisasi, visi dan misi resmi, identitas periode VISTARA, struktur 5 komisi, dan program kerja berkala."
         badge="2026–2027"
         breadcrumbs={[{ label: 'Tentang' }]}
       />
@@ -57,7 +45,7 @@ export default function TentangPage() {
                 </div>
               </div>
               <Link to="/beranda/program-kerja" className="btn btn-primary">
-                Lihat Program Kerja <ArrowRight size={16} />
+                Lihat Seluruh Program Kerja <ArrowRight size={16} />
               </Link>
             </div>
 
@@ -73,14 +61,294 @@ export default function TentangPage() {
         </div>
       </section>
 
-      {/* ── TIGA PILAR ─── */}
+      {/* ── VISI & MISI RESMI OPDIM ─── */}
       <section className="section" style={{ background: 'var(--ghost-purple)' }}>
+        <div className="container">
+          <SectionHeading
+            label="Arah Gerak Resmi"
+            title="Visi & Misi Resmi"
+            highlight="OPDIM"
+            subtitle="Landasan gerak resmi kepengurusan untuk membawa perubahan nyata yang aktif, inovatif, dan aspiratif."
+            align="center"
+          />
+
+          <div style={{ marginTop: '2.5rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            {/* Visi Card */}
+            <div
+              className="card-dark"
+              style={{
+                borderRadius: '20px',
+                padding: 'clamp(1.5rem, 3vw, 2.5rem)',
+                position: 'relative',
+                overflow: 'hidden',
+                boxShadow: '0 20px 40px rgba(45, 27, 105, 0.25)',
+              }}
+            >
+              <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '180px', height: '180px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(201,168,76,0.15) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', marginBottom: '1.25rem' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(201,168,76,0.2)', border: '1px solid rgba(201,168,76,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem' }}>
+                  🌟
+                </div>
+                <div>
+                  <span style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--gold-soft)', fontWeight: 700 }}>
+                    Visi Resmi OPDIM
+                  </span>
+                  <h3 style={{ color: 'white', fontSize: 'clamp(1.2rem, 2.5vw, 1.6rem)', margin: 0, fontWeight: 800 }}>
+                    Visi Kepengurusan
+                  </h3>
+                </div>
+              </div>
+
+              <blockquote style={{ fontSize: 'clamp(1.1rem, 2vw, 1.45rem)', color: 'white', fontWeight: 700, lineHeight: 1.5, margin: '0 0 1.25rem', fontFamily: 'var(--font-display)', borderLeft: '4px solid var(--gold-accent)', paddingLeft: '1.25rem' }}>
+                “{visiMisiOfficial.visi.teks}”
+              </blockquote>
+
+              <div style={{ background: 'rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '1rem 1.25rem', border: '1px solid rgba(185, 154, 225, 0.2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                  <span style={{ color: 'var(--gold-soft)', fontWeight: 700, fontSize: '0.9rem' }}>➡️ Artinya:</span>
+                </div>
+                <p style={{ color: 'rgba(237, 230, 248, 0.95)', fontSize: '0.95rem', lineHeight: 1.7, margin: 0 }}>
+                  {visiMisiOfficial.visi.artinya}
+                </p>
+              </div>
+            </div>
+
+            {/* Misi Cards */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--lavender-mist)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Target size={22} style={{ color: 'var(--vistara-purple)' }} />
+                </div>
+                <div>
+                  <span style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--mid-grey)', fontWeight: 600 }}>5 Poin Prioritas Gerak</span>
+                  <h3 style={{ color: 'var(--deep-violet)', fontSize: '1.35rem', margin: 0, fontWeight: 800 }}>Misi Resmi OPDIM</h3>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+                {visiMisiOfficial.misi.map((m) => (
+                  <div
+                    key={m.nomor}
+                    className="card"
+                    style={{
+                      borderTop: '3px solid var(--vistara-purple)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.75rem',
+                      padding: '1.35rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <span
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '8px',
+                          background: 'linear-gradient(135deg, var(--deep-violet), var(--vistara-purple))',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontFamily: 'var(--font-display)',
+                          fontWeight: 800,
+                          fontSize: '0.9rem',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {m.nomor}
+                      </span>
+                      <h4 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.05rem', color: 'var(--deep-violet)', margin: 0, lineHeight: 1.35 }}>
+                        {m.poin}
+                      </h4>
+                    </div>
+
+                    <div style={{ background: 'var(--ghost-purple)', borderRadius: '10px', padding: '0.75rem 1rem', borderLeft: '3px solid var(--soft-lilac)', marginTop: 'auto' }}>
+                      <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', fontWeight: 700, color: 'var(--vistara-purple)', marginBottom: '0.2rem' }}>
+                        ➡️ Artinya:
+                      </div>
+                      <p style={{ fontSize: '0.85rem', color: 'var(--charcoal)', lineHeight: 1.6, margin: 0 }}>
+                        {m.artinya}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── PROGRAM KERJA SIKLUS RESMI (HARIAN, MINGGUAN, BULANAN, TAHUNAN) ─── */}
+      <section className="section" style={{ background: 'var(--warm-white)' }}>
+        <div className="container">
+          <SectionHeading
+            label="Siklus Kegiatan"
+            title="Program Kerja Berkala"
+            highlight="Resmi"
+            subtitle="Agenda berkesinambungan OPDIM yang dieksekusi secara harian, mingguan, bulanan, hingga perhelatan puncak tahunan."
+            align="center"
+          />
+
+          <div style={{ marginTop: '2.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+            {prokerSiklusData.map((siklus) => (
+              <div
+                key={siklus.id}
+                className="card"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  borderTop: `4px solid ${
+                    siklus.frekuensi === 'Harian' ? '#2E7D32' :
+                    siklus.frekuensi === 'Mingguan' ? 'var(--orchid)' :
+                    siklus.frekuensi === 'Bulanan' ? 'var(--vistara-purple)' :
+                    'var(--gold-accent)'
+                  }`,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <span
+                    className="badge"
+                    style={{
+                      background:
+                        siklus.frekuensi === 'Harian' ? 'rgba(46, 125, 50, 0.12)' :
+                        siklus.frekuensi === 'Mingguan' ? 'rgba(155, 114, 204, 0.15)' :
+                        siklus.frekuensi === 'Bulanan' ? 'rgba(107, 63, 160, 0.12)' :
+                        'rgba(201, 168, 76, 0.18)',
+                      color:
+                        siklus.frekuensi === 'Harian' ? '#2E7D32' :
+                        siklus.frekuensi === 'Mingguan' ? 'var(--royal-purple)' :
+                        siklus.frekuensi === 'Bulanan' ? 'var(--deep-violet)' :
+                        '#8A6812',
+                      fontWeight: 700,
+                    }}
+                  >
+                    📅 Program {siklus.frekuensi}
+                  </span>
+                  <span style={{ fontSize: '1.5rem' }}>{siklus.icon}</span>
+                </div>
+
+                <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.15rem', color: 'var(--deep-violet)', marginBottom: '0.5rem', lineHeight: 1.3 }}>
+                  {siklus.judul}
+                </h3>
+
+                <div style={{ background: 'var(--ghost-purple)', borderRadius: '8px', padding: '0.75rem 0.875rem', marginBottom: '1rem', flex: 1 }}>
+                  <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', fontWeight: 700, color: 'var(--vistara-purple)', marginBottom: '0.25rem' }}>
+                    ➡️ Artinya:
+                  </div>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--charcoal)', lineHeight: 1.6, margin: 0 }}>
+                    {siklus.artinya}
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--pale-lilac)', paddingTop: '0.75rem' }}>
+                  <span style={{ fontFamily: 'var(--font-header)', fontSize: '0.75rem', color: 'var(--mid-grey)' }}>
+                    Pelaksana: <strong>{siklus.pelaksana.split('&')[0]}</strong>
+                  </span>
+                  <Link
+                    to={`/beranda/program-kerja/${siklus.slug}`}
+                    style={{
+                      fontFamily: 'var(--font-header)',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      color: 'var(--vistara-purple)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    Detail <ArrowRight size={14} />
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── 5 KOMISI RESMI OPDIM & STRUKTUR ─── */}
+      <section className="section" style={{ background: 'var(--ghost-purple)' }}>
+        <div className="container">
+          <SectionHeading
+            label="Struktur Organisasi Resmi"
+            title="5 Komisi Pelaksana"
+            highlight="OPDIM"
+            subtitle="Lima komisi resmi yang menggerakkan roda organisasi dengan tugas pokok, fungsi, dan susunan personil yang jelas."
+            align="center"
+          />
+
+          <div style={{ marginTop: '2.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+            {komisiData.map((komisi) => (
+              <div
+                key={komisi.id}
+                className="card"
+                style={{
+                  borderLeft: `5px solid ${komisi.color}`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.875rem',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ fontSize: '2rem' }}>{komisi.icon}</span>
+                    <div>
+                      <span className="badge" style={{ background: `${komisi.color}15`, color: komisi.color, border: `1px solid ${komisi.color}35`, fontSize: '0.65rem', marginBottom: '0.2rem' }}>
+                        {komisi.name}
+                      </span>
+                      <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', color: 'var(--deep-violet)', margin: 0 }}>
+                        {komisi.fullName.replace(`${komisi.name} — `, '')}
+                      </h3>
+                    </div>
+                  </div>
+                </div>
+
+                {komisi.tagline && (
+                  <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.75rem', color: 'var(--vistara-purple)', fontWeight: 600, fontStyle: 'italic' }}>
+                    Tagline: {komisi.tagline}
+                  </div>
+                )}
+
+                <p style={{ fontSize: '0.85rem', color: 'var(--charcoal)', lineHeight: 1.65, margin: 0, flex: 1 }}>
+                  {komisi.description}
+                </p>
+
+                {/* Struktur Pengurus Komisi (Ketua & Anggota jika ada) */}
+                {(komisi.ketua || (komisi.anggota && komisi.anggota.length > 0)) && (
+                  <div style={{ background: 'var(--ghost-purple)', borderRadius: '10px', padding: '0.875rem', border: '1px solid var(--pale-lilac)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                      <UserCheck size={14} style={{ color: komisi.color }} />
+                      <span style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--deep-violet)' }}>
+                        Personil Komisi:
+                      </span>
+                    </div>
+                    {komisi.ketua && (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--charcoal)', marginBottom: '0.25rem' }}>
+                        <strong>Ketua Komisi:</strong> {komisi.ketua}
+                      </div>
+                    )}
+                    {komisi.anggota && komisi.anggota.length > 0 && (
+                      <div style={{ fontSize: '0.78rem', color: 'var(--mid-grey)', lineHeight: 1.5 }}>
+                        <strong>Anggota:</strong> {komisi.anggota.join(', ')}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── TIGA PILAR KONSEPTUAL ─── */}
+      <section className="section" style={{ background: 'var(--warm-white)' }}>
         <div className="container">
           <SectionHeading
             label="Filosofi Dasar"
             title="Tiga Pilar Konseptual"
             highlight="VISTARA"
-            subtitle="Landasan filosofis yang menjadi jiwa seluruh gerak kepengurusan."
+            subtitle="Landasan filosofis yang menjadi jiwa seluruh gerak kepengurusan periode 2026–2027."
             align="center"
           />
           <div style={{ marginTop: '2.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.5rem' }}>
@@ -96,91 +364,6 @@ export default function TentangPage() {
                   {pilar.subtitle}
                 </div>
                 <p style={{ fontSize: '0.875rem', color: 'var(--charcoal)', lineHeight: 1.7 }}>{pilar.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── VISI & MISI ─── */}
-      <section className="section" style={{ background: 'var(--warm-white)' }}>
-        <div className="container">
-          <SectionHeading label="Arah Gerak" title="Visi & Misi" highlight="OPDIM" align="center" />
-          <div style={{ marginTop: '2.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
-            {/* Visi */}
-            <div className="card-dark" style={{ borderRadius: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(185,154,225,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Eye size={20} style={{ color: 'var(--soft-lilac)' }} />
-                </div>
-                <h3 style={{ color: 'white', fontSize: '1.2rem', margin: 0 }}>Visi</h3>
-              </div>
-              <p style={{ color: 'rgba(185,154,225,0.9)', lineHeight: 1.7, fontStyle: 'italic', borderLeft: '2px solid var(--soft-lilac)', paddingLeft: '1rem' }}>
-                "{visiMisi.visi}"
-              </p>
-            </div>
-
-            {/* Misi */}
-            <div className="card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--lavender-mist)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Target size={20} style={{ color: 'var(--vistara-purple)' }} />
-                </div>
-                <h3 style={{ color: 'var(--deep-violet)', fontSize: '1.2rem', margin: 0 }}>Misi</h3>
-              </div>
-              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-                {visiMisi.misi.map((item, i) => (
-                  <li key={i} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                    <span style={{ width: '22px', height: '22px', borderRadius: '6px', background: 'var(--lavender-mist)', color: 'var(--vistara-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-header)', fontWeight: 700, fontSize: '0.7rem', flexShrink: 0, marginTop: '2px' }}>
-                      {i + 1}
-                    </span>
-                    <p style={{ fontSize: '0.875rem', color: 'var(--charcoal)', lineHeight: 1.6, margin: 0 }}>{item}</p>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 5 KOMISI ─── */}
-      <section className="section" style={{ background: 'var(--ghost-purple)' }}>
-        <div className="container">
-          <SectionHeading
-            label="Struktur Organisasi"
-            title="5 Komisi"
-            highlight="VISTARA"
-            subtitle="Lima komisi pelaksana yang menggerakkan amanah kepengurusan: Pengawasan, Hubungan Eksternal, Hubungan Internal Sekolah, Aspirasi Siswa, dan Humas."
-          />
-          <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.25rem' }}>
-            {komisiData.map((komisi) => (
-              <div key={komisi.id} className="card" style={{ borderLeft: `4px solid ${komisi.color}`, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                  <span style={{ fontSize: '1.5rem' }}>{komisi.icon}</span>
-                  <div>
-                    <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', color: 'var(--mid-grey)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{komisi.name}</div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', color: 'var(--deep-violet)' }}>
-                      {komisi.fullName.replace(`${komisi.name} — `, '')}
-                    </div>
-                  </div>
-                </div>
-                <p style={{ fontSize: '0.8rem', color: 'var(--mid-grey)', lineHeight: 1.6, flex: 1 }}>{komisi.description}</p>
-                <Link
-                  to={`/beranda/program-kerja`}
-                  style={{
-                    fontFamily: 'var(--font-header)',
-                    fontSize: '0.75rem',
-                    color: komisi.color,
-                    fontWeight: 600,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.25rem',
-                    marginTop: '0.75rem',
-                    textDecoration: 'none',
-                  }}
-                >
-                  Lihat Proker {komisi.name} <ArrowRight size={12} />
-                </Link>
               </div>
             ))}
           </div>
@@ -209,3 +392,4 @@ export default function TentangPage() {
     </div>
   );
 }
+
