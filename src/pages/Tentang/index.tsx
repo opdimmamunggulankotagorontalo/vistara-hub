@@ -150,11 +150,11 @@ export default function TentangPage() {
             label="Struktur Organisasi"
             title="5 Komisi"
             highlight="VISTARA"
-            subtitle="Lima komisi pelaksana yang menggerakkan program kerja OPDIM: Keagamaan, Kepemimpinan, Akademik, Aspirasi Siswa, dan Humas & Media Digital."
+            subtitle="Lima komisi pelaksana yang menggerakkan amanah kepengurusan: Pengawasan, Hubungan Eksternal, Hubungan Internal Sekolah, Aspirasi Siswa, dan Humas."
           />
           <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1.25rem' }}>
             {komisiData.map((komisi) => (
-              <div key={komisi.id} className="card" style={{ borderLeft: `4px solid ${komisi.color}` }}>
+              <div key={komisi.id} className="card" style={{ borderLeft: `4px solid ${komisi.color}`, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
                   <span style={{ fontSize: '1.5rem' }}>{komisi.icon}</span>
                   <div>
@@ -164,7 +164,23 @@ export default function TentangPage() {
                     </div>
                   </div>
                 </div>
-                <p style={{ fontSize: '0.8rem', color: 'var(--mid-grey)', lineHeight: 1.6 }}>{komisi.description}</p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--mid-grey)', lineHeight: 1.6, flex: 1 }}>{komisi.description}</p>
+                <Link
+                  to={`/beranda/program-kerja`}
+                  style={{
+                    fontFamily: 'var(--font-header)',
+                    fontSize: '0.75rem',
+                    color: komisi.color,
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    marginTop: '0.75rem',
+                    textDecoration: 'none',
+                  }}
+                >
+                  Lihat Proker {komisi.name} <ArrowRight size={12} />
+                </Link>
               </div>
             ))}
           </div>

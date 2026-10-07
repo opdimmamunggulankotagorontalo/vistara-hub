@@ -19,6 +19,11 @@ export interface ProgramKerja {
   thumbnail?: string;
   timeline: string;
   targetOutput: string;
+  frekuensi?: 'Harian' | 'Mingguan' | 'Bulanan' | 'Tahunan' | 'Insidental';
+  tujuan?: string;
+  misiMingguan?: { minggu: string; tema: string; deskripsi?: string }[];
+  mekanisme?: string[];
+  pic?: string;
 }
 
 export interface BeritaItem {

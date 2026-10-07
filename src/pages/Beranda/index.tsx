@@ -29,7 +29,7 @@ export default function BerandaPage() {
   const recentBerita = beritaData.slice(0, 3);
   const upcomingEvents = eventData.filter(e => e.status !== 'past').slice(0, 3);
   const latestPrestasi = prestasiData.slice(0, 3);
-  const featuredProker = programKerjaData.slice(0, 3);
+  const featuredProker = programKerjaData.slice(0, 4);
 
   return (
     <div>
@@ -206,13 +206,23 @@ export default function BerandaPage() {
                 className="card"
                 style={{ animationDelay: `${i * 100}ms`, border: `1px solid var(--pale-lilac)` }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                  <span
-                    className="badge"
-                    style={{ background: `${proker.komisiColor}20`, color: proker.komisiColor, border: `1px solid ${proker.komisiColor}40`, fontSize: '0.65rem' }}
-                  >
-                    {proker.komisi}
-                  </span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                    <span
+                      className="badge"
+                      style={{ background: `${proker.komisiColor}20`, color: proker.komisiColor, border: `1px solid ${proker.komisiColor}40`, fontSize: '0.65rem' }}
+                    >
+                      {proker.komisi}
+                    </span>
+                    {proker.frekuensi && (
+                      <span
+                        className="badge"
+                        style={{ background: 'var(--lavender-mist)', color: 'var(--royal-purple)', border: '1px solid var(--pale-lilac)', fontSize: '0.62rem' }}
+                      >
+                        {proker.frekuensi}
+                      </span>
+                    )}
+                  </div>
                   <StatusBadge status={proker.status} />
                 </div>
                 <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', color: 'var(--deep-violet)', marginBottom: '0.5rem', lineHeight: 1.3 }}>
