@@ -966,12 +966,36 @@ export const galeriData: GaleriItem[] = [
 // ─── Arsip ───────────────────────────────────────────────────
 export const arsipData: ArsipItem[] = [
   {
+    id: 'ar-idbook',
+    title: 'OPDIM VISTARA Brand & Identity Book v1.0',
+    jenis: 'dokumen',
+    tanggal: '2026-09-10',
+    ukuran: '1.4 MB',
+    deskripsi: 'Buku panduan resmi identitas visual, filosofi nama VISTARA, tipografi, warna ungu-emas, logo, dan maskot TARA.',
+  },
+  {
+    id: 'ar-proker-rekap',
+    title: 'Kompilasi & Rekapitulasi Resmi 23 Program Kerja 5 Komisi',
+    jenis: 'dokumen',
+    tanggal: '2026-09-25',
+    ukuran: '780 KB',
+    deskripsi: 'Dokumen Bab 1–6 rekapitulasi seluruh program kerja resmi 5 Komisi beserta matriks terpadu, SOP, dan pembagian otoritas.',
+  },
+  {
+    id: 'ar-osis-quest',
+    title: 'OSIS Quest OPDIM VISTARA: Kompilasi Kurikulum & Tata Kelola',
+    jenis: 'dokumen',
+    tanggal: '2026-09-28',
+    ukuran: '1.2 MB',
+    deskripsi: 'Dokumen acuan strategis komprehensif 56 bagian yang memandu seluruh pilar kepengurusan dan partisipasi pelajar.',
+  },
+  {
     id: 'ar1',
     title: 'SK Pelantikan Pengurus OPDIM VISTARA 2026–2027',
     jenis: 'sk',
     tanggal: '2026-09-15',
     ukuran: '245 KB',
-    deskripsi: 'Surat Keputusan resmi pelantikan pengurus OPDIM periode VISTARA dari Kepala Madrasah.',
+    deskripsi: 'Surat Keputusan resmi pelantikan pengurus OPDIM periode VISTARA dari Kepala Madrasah Aliyah Muhammadiyah Unggulan Kota Gorontalo.',
   },
   {
     id: 'ar2',
@@ -980,14 +1004,6 @@ export const arsipData: ArsipItem[] = [
     tanggal: '2026-09-22',
     ukuran: '128 KB',
     deskripsi: 'Catatan resmi hasil Rapat Kerja perdana 5 Komisi OPDIM VISTARA 2026–2027.',
-  },
-  {
-    id: 'ar3',
-    title: 'Program Kerja OPDIM VISTARA 2026–2027',
-    jenis: 'dokumen',
-    tanggal: '2026-09-25',
-    ukuran: '892 KB',
-    deskripsi: 'Dokumen lengkap program kerja seluruh komisi periode VISTARA.',
   },
   {
     id: 'ar4',
