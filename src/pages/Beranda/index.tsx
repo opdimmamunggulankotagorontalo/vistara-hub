@@ -54,17 +54,42 @@ export default function BerandaPage() {
         <div className="container" style={{ position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '2rem', alignItems: 'center' }}>
             {/* Left: Text content */}
-            <div style={{ maxWidth: '680px' }}>
-              {/* Badge */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(185,154,225,0.12)', border: '1px solid rgba(185,154,225,0.3)', borderRadius: '100px', padding: '0.3rem 1rem' }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--soft-lilac)', boxShadow: '0 0 6px var(--soft-lilac)' }} />
-                  <span style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', letterSpacing: '0.12em', color: 'var(--soft-lilac)', textTransform: 'uppercase', fontWeight: 600 }}>
-                    Platform Digital Resmi
-                  </span>
-                </div>
-                <span className="badge badge-gold">OPDIM VISTARA 2026–2027</span>
+            <div style={{ maxWidth: '680px', position: 'relative' }}>
+              {/* Background Watermark Logo VISTARA for Mobile */}
+              <div
+                className="hero-mobile-logo"
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  right: '-15px',
+                  top: '15px',
+                  width: '220px',
+                  height: '220px',
+                  pointerEvents: 'none',
+                  zIndex: 0,
+                  opacity: 0.16,
+                  filter: 'drop-shadow(0 0 24px rgba(185, 154, 225, 0.4))',
+                  userSelect: 'none',
+                }}
+              >
+                <img
+                  src="/logo-vistara.svg"
+                  alt=""
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                />
               </div>
+
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                {/* Badge */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(185,154,225,0.12)', border: '1px solid rgba(185,154,225,0.3)', borderRadius: '100px', padding: '0.3rem 1rem' }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--soft-lilac)', boxShadow: '0 0 6px var(--soft-lilac)' }} />
+                    <span style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', letterSpacing: '0.12em', color: 'var(--soft-lilac)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Platform Digital Resmi
+                    </span>
+                  </div>
+                  <span className="badge badge-gold">OPDIM VISTARA 2026–2027</span>
+                </div>
 
               {/* Organization name */}
               <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.85rem', letterSpacing: '0.2em', color: 'rgba(185,154,225,0.7)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
@@ -116,6 +141,7 @@ export default function BerandaPage() {
                   Tentang VISTARA
                   <ArrowRight size={18} />
                 </Link>
+                </div>
               </div>
             </div>
 
@@ -149,6 +175,7 @@ export default function BerandaPage() {
         <style>{`
           @media (min-width: 768px) {
             #hero-mascot { display: flex !important; }
+            .hero-mobile-logo { display: none !important; }
           }
         `}</style>
       </section>

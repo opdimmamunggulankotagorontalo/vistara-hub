@@ -39,12 +39,12 @@ export default function Navbar() {
           height: 'var(--nav-height)',
           transition: 'background var(--transition-base), box-shadow var(--transition-base)',
           background: scrolled
-            ? 'rgba(19, 11, 36, 0.96)'
-            : 'linear-gradient(180deg, rgba(19, 11, 36, 0.9) 0%, rgba(19, 11, 36, 0.6) 100%)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          borderBottom: scrolled ? '1px solid rgba(185,154,225,0.12)' : '1px solid transparent',
-          boxShadow: scrolled ? '0 4px 24px rgba(0,0,0,0.3)' : 'none',
+            ? 'rgba(38, 20, 72, 0.96)'
+            : 'linear-gradient(180deg, rgba(45, 27, 105, 0.95) 0%, rgba(36, 18, 66, 0.85) 100%)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderBottom: scrolled ? '1px solid rgba(185,154,225,0.15)' : '1px solid rgba(185,154,225,0.08)',
+          boxShadow: scrolled ? '0 4px 24px rgba(20, 10, 40, 0.35)' : 'none',
         }}
       >
         <div className="container" style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem' }}>
@@ -197,7 +197,7 @@ export default function Navbar() {
           bottom: 0,
           width: '280px',
           zIndex: 60,
-          background: 'linear-gradient(180deg, #130B24 0%, #20113B 100%)',
+          background: 'linear-gradient(180deg, #2D1B69 0%, #1A0E33 100%)',
           borderLeft: '1px solid rgba(185,154,225,0.15)',
           transform: mobileOpen ? 'translateX(0)' : 'translateX(100%)',
           transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',

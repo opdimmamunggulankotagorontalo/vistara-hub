@@ -157,9 +157,9 @@ main {
 
 .bg-gradient-mesh {
   background:
-    radial-gradient(circle at 80% 20%, rgba(132, 92, 188, 0.35) 0%, transparent 55%),
-    radial-gradient(circle at 10% 80%, rgba(74, 44, 138, 0.4) 0%, transparent 50%),
-    linear-gradient(155deg, #130B24 0%, #20113B 50%, #2D1B69 100%);
+    radial-gradient(circle at 80% 20%, rgba(155, 114, 204, 0.35) 0%, transparent 55%),
+    radial-gradient(circle at 10% 80%, rgba(107, 63, 160, 0.4) 0%, transparent 50%),
+    linear-gradient(155deg, #2D1B69 0%, #20113B 50%, #2D1B69 100%);
 }
 
 .bg-ghost { background-color: var(--ghost-purple); }
