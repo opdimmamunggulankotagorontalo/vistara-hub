@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Target, Zap, UserCheck } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { SectionHeading } from '../../components/ui';
-import { komisiData, visiMisiOfficial, prokerSiklusData } from '../../data';
+import { komisiData, visiMisiOfficial, prokerSiklusData, pengurusInti } from '../../data';
 
 const tiga_pilar = [
   { num: '01', title: 'SATU TITIK', subtitle: 'Fokus & Keberanian Memilih', desc: 'Setiap transformasi besar bermula dari satu titik tolak: satu suara, satu niat tulus, satu gagasan yang diperjuangkan dengan kesungguhan.', color: 'var(--deep-violet)' },
@@ -278,7 +278,65 @@ export default function TentangPage() {
             align="center"
           />
 
-          <div style={{ marginTop: '2.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+          {/* ── PENGURUS INTI OPDIM VISTARA ── */}
+          <div
+            className="card"
+            style={{
+              marginTop: '2.5rem',
+              marginBottom: '2rem',
+              padding: '1.75rem',
+              background: 'white',
+              border: '1.5px solid var(--pale-lilac)',
+              borderRadius: '16px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
+              <span className="badge badge-purple">Pimpinan & Pembina</span>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--deep-violet)' }}>
+                Pengurus Inti OPDIM VISTARA 2026–2027
+              </h3>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '1rem' }}>
+              <div style={{ background: 'var(--ghost-purple)', padding: '1rem', borderRadius: '12px', borderLeft: '4px solid var(--deep-violet)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--mid-grey)', fontFamily: 'var(--font-header)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.25rem' }}>
+                  Ketua Umum OPDIM
+                </div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--deep-violet)' }}>
+                  {pengurusInti.ketuaUmum}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--charcoal)', marginTop: '0.2rem' }}>
+                  Pemimpin Mandat Periode VISTARA
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--ghost-purple)', padding: '1rem', borderRadius: '12px', borderLeft: '4px solid var(--royal-purple)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--mid-grey)', fontFamily: 'var(--font-header)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.25rem' }}>
+                  Sekretaris Umum OPDIM
+                </div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--deep-violet)' }}>
+                  {pengurusInti.sekretarisUmum}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--charcoal)', marginTop: '0.2rem' }}>
+                  Administrasi, Persuratan & Super Admin
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--ghost-purple)', padding: '1rem', borderRadius: '12px', borderLeft: '4px solid var(--gold-accent)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--mid-grey)', fontFamily: 'var(--font-header)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.25rem' }}>
+                  Pembina OPDIM
+                </div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--deep-violet)' }}>
+                  {pengurusInti.pembina}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--charcoal)', marginTop: '0.2rem' }}>
+                  Pengarah & Majelis Pembina Madrasah
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '1.5rem' }}>
             {komisiData.map((komisi) => (
               <div
                 key={komisi.id}

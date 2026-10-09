@@ -1,7 +1,7 @@
 // ============================================================
-// VISTARA Hub — Demo Data
+// VISTARA Hub — Master Data Resmi
 // OPDIM VISTARA 2026–2027
-// NOTE: All data is fictional/demo. Replace when backend ready.
+// Data Resmi Terverifikasi sesuai Dokumen Rekap Proker, OSIS Quest & Identity Book
 // ============================================================
 
 import type {
@@ -14,7 +14,17 @@ import type {
   KomisiInfo,
   VisiMisiOfficial,
   ProkerSiklusItem,
+  AspirasiRecord,
+  PengurusInti,
 } from '../types';
+
+// ─── PENGURUS INTI RESMI OPDIM VISTARA ──────────────────────
+export const pengurusInti: PengurusInti = {
+  ketuaUmum: 'M. Aryansyah Thaib',
+  sekretarisUmum: 'Muhammad Yusuf Lauma',
+  pembina: 'Selvianingsih Salilama, S.Pd.',
+  kepalaMadrasah: 'Kepala MAM Unggulan Kota Gorontalo',
+};
 
 // ─── VISI & MISI RESMI OPDIM ────────────────────────────────
 export const visiMisiOfficial: VisiMisiOfficial = {
@@ -140,6 +150,8 @@ export const komisiData: KomisiInfo[] = [
     color: '#9B72CC',
     icon: '💬',
     tagline: 'Terbuka • Transparan • Responsif • Solutif',
+    ketua: 'Nayla Syaqila Husain',
+    anggota: ['Ain Tahir', 'Aisyah Karimah'],
     description: 'Wadah resmi penampungan suara siswa melalui kanal daring (Google Form & Instagram) serta kotak aspirasi fisik, mengurasi masukan penting, dan menyampaikan tindak lanjut secara formal.',
   },
   {
@@ -149,6 +161,8 @@ export const komisiData: KomisiInfo[] = [
     color: '#C9A84C',
     icon: '📸',
     tagline: 'The Voice & Information Channel • Publikasi • Dokumentasi',
+    ketua: "Ihsan Abdussalam Ma'ruf",
+    anggota: ['Tim Liputan & Dokumentasi', 'Tim Desain Grafis & Multimedia'],
     description: 'Mengelola komunikasi publik, dokumentasi visual setiap agenda (Every Event Documentation), poster apresiasi siswa berprestasi (Student Spotlight), dan peringatan hari besar nasional.',
   },
 ];
@@ -879,7 +893,7 @@ export const prestasiData: PrestasiItem[] = [
     title: 'Juara 1 Olimpiade Matematika Tingkat Kabupaten/Kota',
     tingkat: 'kabupaten',
     kategori: 'Akademik',
-    peraih: 'Ahmad Fauzan Hakim',
+    peraih: 'Delegasi Olimpiade Sains MAM Unggulan',
     tahun: '2026',
     medali: 'emas',
     penyelenggara: 'Dinas Pendidikan Kota Gorontalo',
@@ -901,7 +915,7 @@ export const prestasiData: PrestasiItem[] = [
     title: 'Finalis Olimpiade Fisika Tingkat Nasional (OSN)',
     tingkat: 'nasional',
     kategori: 'Akademik',
-    peraih: 'Nabila Putri Maharani',
+    peraih: 'Kader Sains Madrasah MAM Unggulan',
     tahun: '2026',
     medali: 'peserta',
     penyelenggara: 'Kemendikbud RI',
@@ -1027,4 +1041,86 @@ export const navItems = [
   { label: 'Prestasi', href: '/beranda/prestasi' },
   { label: 'Arsip', href: '/beranda/arsip' },
   { label: 'Kontak', href: '/beranda/kontak' },
+];
+
+// ─── Data Kotak Aspirasi Resmi (Komisi 4) ────────────────────
+export const initialAspirasiData: AspirasiRecord[] = [
+  {
+    id: 'asp-1',
+    kodeLacak: 'ASP-2026-1001',
+    jenis: 'Saran',
+    kategori: 'Fasilitas Madrasah',
+    judul: 'Penambahan Dispenser Air Minum di Lorong Kelas Lantai 2',
+    isi: 'Penyediaan dispenser air minum isi ulang di dekat ruang kelas lantai 2 agar santri dan siswa tidak perlu turun ke kantin setiap kali membutuhkan air minum saat jam istirahat.',
+    isAnonim: false,
+    namaPengirim: 'Siswa Kelas XI',
+    kelasPengirim: 'XI IPA 1',
+    tanggal: '2026-09-28',
+    status: 'Selesai',
+    tanggapanResmi: 'Aspirasi telah disampaikan kepada bagian sarana madrasah. Dispenser tambahan telah dipasang dan beroperasi di koridor barat lantai 2.',
+    penindaklanjut: 'Komisi 4 OPDIM & Waka Sarpras',
+    riwayatStatus: [
+      { status: 'Diterima', waktu: '28 Sep 2026', keterangan: 'Aspirasi masuk ke sistem Kotak Aspirasi Komisi 4.' },
+      { status: 'Ditinjau', waktu: '29 Sep 2026', keterangan: 'Diverifikasi kelayakannya oleh Komisi 4.' },
+      { status: 'Didiskusikan', waktu: '30 Sep 2026', keterangan: 'Dibahas dalam rapat koordinasi pengurus OPDIM.' },
+      { status: 'Tindak Lanjut', waktu: '02 Okt 2026', keterangan: 'Disampaikan secara resmi dalam audiensi bersama Waka Sarana & Prasarana.' },
+      { status: 'Selesai', waktu: '05 Okt 2026', keterangan: 'Dispenser terpasang dan dapat digunakan bersama.' },
+    ],
+  },
+  {
+    id: 'asp-2',
+    kodeLacak: 'ASP-2026-1002',
+    jenis: 'Ide',
+    kategori: 'Kegiatan Siswa',
+    judul: 'Penguatan Mading Kreasi & Sesi Mentoring Belajar Sebaya',
+    isi: 'Mengusulkan diadakannya rubrik tips belajar mingguan di mading dan sesi belajar kelompok sebaya menjelang ujian semester.',
+    isAnonim: true,
+    tanggal: '2026-10-01',
+    status: 'Tindak Lanjut',
+    tanggapanResmi: 'Ide disinkronkan dengan program Papan Informasi Edukasi Komisi 3 dan sedang dirumuskan format jadwal belajarnya.',
+    penindaklanjut: 'Komisi 4 & Komisi 3',
+    riwayatStatus: [
+      { status: 'Diterima', waktu: '01 Okt 2026', keterangan: 'Aspirasi diterima dan terdata secara anonim.' },
+      { status: 'Ditinjau', waktu: '02 Okt 2026', keterangan: 'Dinilai sangat konstruktif untuk akademik siswa.' },
+      { status: 'Didiskusikan', waktu: '04 Okt 2026', keterangan: 'Dikoordinasikan dengan Komisi 3 bagian Edukasi.' },
+      { status: 'Tindak Lanjut', waktu: '06 Okt 2026', keterangan: 'Penyusunan jadwal rubrik mading dan fasilitasi tutor sebaya.' },
+    ],
+  },
+  {
+    id: 'asp-3',
+    kodeLacak: 'ASP-2026-1003',
+    jenis: 'Saran',
+    kategori: 'Kebersihan & Lingkungan',
+    judul: 'Wadah Sampah Khusus Daur Ulang untuk Trash to Cash',
+    isi: 'Agar program Trash to Cash Komisi 3 berjalan optimal, perlu ditandai tempat sampah khusus botol plastik di setiap sudut gazebo madrasah.',
+    isAnonim: false,
+    namaPengirim: 'Perwakilan Kelas X',
+    kelasPengirim: 'X-2',
+    tanggal: '2026-10-03',
+    status: 'Didiskusikan',
+    tanggapanResmi: 'Sedang dibahas bersama panitia Trash to Cash untuk pengadaan stiker penanda dan karung pilah.',
+    penindaklanjut: 'Komisi 4 & Tim Trash to Cash',
+    riwayatStatus: [
+      { status: 'Diterima', waktu: '03 Okt 2026', keterangan: 'Aspirasi diterima oleh tim piket aspirasi.' },
+      { status: 'Ditinjau', waktu: '04 Okt 2026', keterangan: 'Diteruskan ke Ketua Komisi 4 Nayla Syaqila Husain.' },
+      { status: 'Didiskusikan', waktu: '07 Okt 2026', keterangan: 'Sedang dimusyawarahkan pembiayaan pengadaan penanda bersama Bendahara.' },
+    ],
+  },
+  {
+    id: 'asp-4',
+    kodeLacak: 'ASP-2026-1004',
+    jenis: 'Keluhan',
+    kategori: 'Fasilitas Madrasah',
+    judul: 'Optimalisasi Jaringan Internet WiFi di Perpustakaan',
+    isi: 'Kecepatan internet WiFi di perpustakaan sering melambat saat jam istirahat ketika banyak siswa mengakses referensi materi digital.',
+    isAnonim: true,
+    tanggal: '2026-10-06',
+    status: 'Ditinjau',
+    tanggapanResmi: 'Dalam proses inventarisasi dan koordinasi bersama tim IT madrasah.',
+    penindaklanjut: 'Komisi 4 OPDIM',
+    riwayatStatus: [
+      { status: 'Diterima', waktu: '06 Okt 2026', keterangan: 'Laporan keluhan masuk ke Kotak Aspirasi.' },
+      { status: 'Ditinjau', waktu: '07 Okt 2026', keterangan: 'Komisi 4 melakukan verifikasi kendala sinyal di lokasi perpustakaan.' },
+    ],
+  },
 ];

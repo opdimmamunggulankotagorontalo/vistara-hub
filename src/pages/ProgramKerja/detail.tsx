@@ -179,37 +179,37 @@ export default function ProgramKerjaDetailPage() {
             )}
 
             {/* ── GRID METADATA: TIMELINE, TARGET, PELAKSANA, PJ ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2.5rem' }}>
-              <div className="card" style={{ padding: '1.25rem', display: 'flex', gap: '0.875rem', alignItems: 'flex-start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: '1rem', marginBottom: '2.5rem' }}>
+              <div className="card" style={{ padding: '1.25rem', display: 'flex', gap: '0.875rem', alignItems: 'flex-start', minWidth: 0 }}>
                 <Clock size={20} style={{ color: 'var(--vistara-purple)', marginTop: '2px', flexShrink: 0 }} />
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--mid-grey)', marginBottom: '0.25rem' }}>Timeline</div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.95rem', color: 'var(--deep-violet)' }}>{proker.timeline}</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', color: 'var(--deep-violet)', wordBreak: 'break-word', lineHeight: 1.35 }}>{proker.timeline}</div>
                 </div>
               </div>
 
-              <div className="card" style={{ padding: '1.25rem', display: 'flex', gap: '0.875rem', alignItems: 'flex-start' }}>
+              <div className="card" style={{ padding: '1.25rem', display: 'flex', gap: '0.875rem', alignItems: 'flex-start', minWidth: 0 }}>
                 <Target size={20} style={{ color: 'var(--vistara-purple)', marginTop: '2px', flexShrink: 0 }} />
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--mid-grey)', marginBottom: '0.25rem' }}>Target Output</div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.95rem', color: 'var(--deep-violet)' }}>{proker.targetOutput}</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', color: 'var(--deep-violet)', wordBreak: 'break-word', lineHeight: 1.35 }}>{proker.targetOutput}</div>
                 </div>
               </div>
 
-              <div className="card" style={{ padding: '1.25rem', display: 'flex', gap: '0.875rem', alignItems: 'flex-start' }}>
+              <div className="card" style={{ padding: '1.25rem', display: 'flex', gap: '0.875rem', alignItems: 'flex-start', minWidth: 0 }}>
                 <Users size={20} style={{ color: 'var(--vistara-purple)', marginTop: '2px', flexShrink: 0 }} />
-                <div>
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--mid-grey)', marginBottom: '0.25rem' }}>Pelaksana / Komisi</div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.95rem', color: proker.komisiColor }}>{proker.komisi}</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', color: proker.komisiColor, wordBreak: 'break-word', lineHeight: 1.35 }}>{proker.komisi}</div>
                 </div>
               </div>
 
               {proker.pj && (
-                <div className="card" style={{ padding: '1.25rem', display: 'flex', gap: '0.875rem', alignItems: 'flex-start' }}>
+                <div className="card" style={{ padding: '1.25rem', display: 'flex', gap: '0.875rem', alignItems: 'flex-start', minWidth: 0 }}>
                   <ShieldCheck size={20} style={{ color: 'var(--gold-accent)', marginTop: '2px', flexShrink: 0 }} />
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--mid-grey)', marginBottom: '0.25rem' }}>Penanggung Jawab (PJ)</div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.95rem', color: 'var(--deep-violet)' }}>{proker.pj}</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', color: 'var(--deep-violet)', wordBreak: 'break-word', lineHeight: 1.35 }}>{proker.pj}</div>
                   </div>
                 </div>
               )}

@@ -132,4 +132,34 @@ export interface AspirastiForm {
   kategori: string;
   judul: string;
   isi: string;
+  jenis?: string;
+  isAnonim?: boolean;
+}
+
+export interface AspirasiRecord {
+  id: string;
+  kodeLacak: string;
+  jenis: 'Saran' | 'Keluhan' | 'Ide' | 'Kritik' | 'Pertanyaan' | 'Pujian';
+  kategori: string;
+  judul: string;
+  isi: string;
+  isAnonim: boolean;
+  namaPengirim?: string;
+  kelasPengirim?: string;
+  tanggal: string;
+  status: 'Diterima' | 'Ditinjau' | 'Didiskusikan' | 'Tindak Lanjut' | 'Selesai' | 'Dialihkan';
+  tanggapanResmi?: string;
+  penindaklanjut?: string;
+  riwayatStatus?: {
+    status: string;
+    waktu: string;
+    keterangan: string;
+  }[];
+}
+
+export interface PengurusInti {
+  ketuaUmum: string;
+  sekretarisUmum: string;
+  pembina: string;
+  kepalaMadrasah: string;
 }
