@@ -43,7 +43,14 @@ export default function Arsip() {
 
   const handleDownloadMock = (id: string) => {
     setDownloadedId(id);
-    // Simulating download feedback
+    if (id === 'ar-idbook') {
+      window.open(
+        'https://drive.google.com/file/d/13sMxyTngsF2MtmEjuDojQEMSIJ5MrzhB/view?usp=drive_link',
+        '_blank',
+        'noopener,noreferrer'
+      );
+    }
+    // Download feedback reset
     setTimeout(() => {
       setDownloadedId(null);
     }, 2500);
