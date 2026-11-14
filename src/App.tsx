@@ -21,6 +21,7 @@ const Prestasi = lazy(() => import('./pages/Prestasi'));
 const PrestasiDetail = lazy(() => import('./pages/Prestasi/detail'));
 const Arsip = lazy(() => import('./pages/Arsip'));
 const Kontak = lazy(() => import('./pages/Kontak'));
+const Admin = lazy(() => import('./pages/Admin'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 /**
@@ -37,56 +38,72 @@ function ScrollToTop() {
   return null;
 }
 
+function PublicLayoutRoutes() {
+  return (
+    <Layout>
+      <Suspense fallback={<LoadingState />}>
+        <Routes>
+          {/* Default redirect to /beranda */}
+          <Route path="/" element={<Navigate to="/beranda" replace />} />
+
+          {/* Primary Route: Beranda (Homepage / Public Dashboard) */}
+          <Route path="/beranda" element={<Beranda />} />
+
+          {/* Core Feature Pages */}
+          <Route path="/beranda/tentang" element={<Tentang />} />
+
+          {/* Program Kerja + Detail */}
+          <Route path="/beranda/program-kerja" element={<ProgramKerja />} />
+          <Route path="/beranda/program-kerja/:slug" element={<ProgramKerjaDetail />} />
+
+          {/* Suara Aspirasi */}
+          <Route path="/beranda/aspirasi" element={<Aspirasi />} />
+
+          {/* Berita + Detail */}
+          <Route path="/beranda/berita" element={<Berita />} />
+          <Route path="/beranda/berita/:slug" element={<BeritaDetail />} />
+
+          {/* Galeri + Detail */}
+          <Route path="/beranda/galeri" element={<Galeri />} />
+          <Route path="/beranda/galeri/:slug" element={<GaleriDetail />} />
+
+          {/* Agenda Event */}
+          <Route path="/beranda/event" element={<Event />} />
+
+          {/* Hall of Fame Prestasi + Detail */}
+          <Route path="/beranda/prestasi" element={<Prestasi />} />
+          <Route path="/beranda/prestasi/:slug" element={<PrestasiDetail />} />
+
+          {/* Pusat Arsip & Dokumen */}
+          <Route path="/beranda/arsip" element={<Arsip />} />
+
+          {/* Kontak & Sekretariat */}
+          <Route path="/beranda/kontak" element={<Kontak />} />
+
+          {/* 404 Fallback Route */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+    </Layout>
+  );
+}
+
 export default function App() {
   return (
     <MotionProvider>
       <BrowserRouter>
         <ScrollToTop />
-        <Layout>
-          <Suspense fallback={<LoadingState />}>
-            <Routes>
-              {/* Default redirect to /beranda */}
-              <Route path="/" element={<Navigate to="/beranda" replace />} />
-
-              {/* Primary Route: Beranda (Homepage / Public Dashboard) */}
-              <Route path="/beranda" element={<Beranda />} />
-
-              {/* Core Feature Pages */}
-              <Route path="/beranda/tentang" element={<Tentang />} />
-
-              {/* Program Kerja + Detail */}
-              <Route path="/beranda/program-kerja" element={<ProgramKerja />} />
-              <Route path="/beranda/program-kerja/:slug" element={<ProgramKerjaDetail />} />
-
-              {/* Suara Aspirasi */}
-              <Route path="/beranda/aspirasi" element={<Aspirasi />} />
-
-              {/* Berita + Detail */}
-              <Route path="/beranda/berita" element={<Berita />} />
-              <Route path="/beranda/berita/:slug" element={<BeritaDetail />} />
-
-              {/* Galeri + Detail */}
-              <Route path="/beranda/galeri" element={<Galeri />} />
-              <Route path="/beranda/galeri/:slug" element={<GaleriDetail />} />
-
-              {/* Agenda Event */}
-              <Route path="/beranda/event" element={<Event />} />
-
-              {/* Hall of Fame Prestasi + Detail */}
-              <Route path="/beranda/prestasi" element={<Prestasi />} />
-              <Route path="/beranda/prestasi/:slug" element={<PrestasiDetail />} />
-
-              {/* Pusat Arsip & Dokumen */}
-              <Route path="/beranda/arsip" element={<Arsip />} />
-
-              {/* Kontak & Sekretariat */}
-              <Route path="/beranda/kontak" element={<Kontak />} />
-
-              {/* 404 Fallback Route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </Layout>
+        <Routes>
+          <Route
+            path="/admin/*"
+            element={
+              <Suspense fallback={<LoadingState />}>
+                <Admin />
+              </Suspense>
+            }
+          />
+          <Route path="/*" element={<PublicLayoutRoutes />} />
+        </Routes>
       </BrowserRouter>
     </MotionProvider>
   );

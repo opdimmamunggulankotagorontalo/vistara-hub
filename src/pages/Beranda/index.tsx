@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, Megaphone, Newspaper, Calendar, Trophy,
   Image, BookOpen, Users, Zap
 } from 'lucide-react';
 import { motion, useMotionValue, useSpring } from 'motion/react';
-import { SectionHeading, Badge, StatusBadge } from '../../components/ui';
-import { programKerjaData, beritaData, eventData, prestasiData, galeriData } from '../../data';
+import { SectionHeading, Badge, StatusBadge, EmptyState } from '../../components/ui';
+import { programKerjaData } from '../../data';
+import type { BeritaItem, EventItem, GaleriItem, PrestasiItem } from '../../types';
+import { fetchBerita, fetchEvents, fetchGaleri, fetchPrestasi, subscribeToTableChanges } from '../../services/dataClient';
 import CrystalCanvas from '../../components/motion/CrystalCanvas';
 import {
   AnimatedCounter,
@@ -21,7 +23,9 @@ const EXPO_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 // ─── Helper: format tanggal ───────────────────────────────────
 function formatDate(dateStr: string) {
-  return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(dateStr));
+  const parsed = new Date(dateStr);
+  if (Number.isNaN(parsed.getTime())) return dateStr;
+  return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(parsed);
 }
 
 // ─── Stat Item with AnimatedCounter ───────────────────────────
@@ -129,12 +133,32 @@ const MARQUEE_ITEMS = [
 export default function BerandaPage() {
   const { reducedMotion } = useMotionSystem();
   const [hoveredTrait, setHoveredTrait] = useState<string | null>(null);
+  const [liveBerita, setLiveBerita] = useState<BeritaItem[]>([]);
+  const [liveEvents, setLiveEvents] = useState<EventItem[]>([]);
+  const [liveGaleri, setLiveGaleri] = useState<GaleriItem[]>([]);
+  const [livePrestasi, setLivePrestasi] = useState<PrestasiItem[]>([]);
 
-  const recentBerita = beritaData.slice(0, 3);
-  const upcomingEvents = eventData.filter((e) => e.status !== 'past').slice(0, 3);
-  const latestPrestasi = prestasiData.slice(0, 3);
+  useEffect(() => {
+    let active = true;
+    const loadAll = () => {
+      void fetchBerita().then((items) => { if (active) setLiveBerita(items); });
+      void fetchEvents().then((items) => { if (active) setLiveEvents(items); });
+      void fetchGaleri().then((items) => { if (active) setLiveGaleri(items); });
+      void fetchPrestasi().then((items) => { if (active) setLivePrestasi(items); });
+    };
+    loadAll();
+    const unsub = subscribeToTableChanges(['berita', 'events', 'gallery', 'prestasi'], loadAll);
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, []);
+
+  const recentBerita = liveBerita.slice(0, 3);
+  const upcomingEvents = liveEvents.filter((e) => e.status !== 'past').slice(0, 3);
+  const latestPrestasi = livePrestasi.slice(0, 3);
   const featuredProker = programKerjaData.slice(0, 3);
-  const featuredGaleri = galeriData.slice(0, 4);
+  const featuredGaleri = liveGaleri.slice(0, 4);
 
   return (
     <div>
@@ -344,7 +368,7 @@ export default function BerandaPage() {
           <div style={{ marginTop: 'clamp(2rem, 5vw, 3.75rem)', paddingTop: 'clamp(1.5rem, 3.5vw, 2.25rem)', borderTop: '1px solid rgba(185,154,225,0.12)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(115px, 1fr))', gap: 'clamp(1rem, 2.5vw, 2rem)' }}>
             <StatItem target={5} label="Komisi Aktif" delay={0.05} />
             <StatItem target={23} label="Program Kerja Resmi" delay={0.12} />
-            <StatItem target={6} label="Prestasi 2026" delay={0.19} />
+            <StatItem target={livePrestasi.length} label="Prestasi Tercatat" delay={0.19} />
             <StatItem target={400} suffix="+" label="Siswa MAM" delay={0.26} />
           </div>
         </div>
@@ -477,32 +501,50 @@ export default function BerandaPage() {
             </MagneticWrapper>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-            {recentBerita.map((berita, i) => (
-              <ScrollReveal key={berita.id} preset="clipUp" delay={i * 0.08}>
-                <TiltSpotlightCard cursorLabel="Baca" style={{ height: '100%' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                    <Badge variant="ghost">{berita.category}</Badge>
-                    <span style={{ fontFamily: 'var(--font-header)', fontSize: '0.72rem', color: 'var(--light-grey)' }}>
-                      {formatDate(berita.date)}
-                    </span>
-                  </div>
-                  <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--deep-violet)', marginBottom: '0.5rem', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    {berita.title}
-                  </h3>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--mid-grey)', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', marginBottom: '1rem', flex: 1 }}>
-                    {berita.excerpt}
-                  </p>
-                  <Link
-                    to={`/beranda/berita/${berita.slug}`}
-                    style={{ fontFamily: 'var(--font-header)', fontSize: '0.8rem', color: 'var(--vistara-purple)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none', marginTop: 'auto' }}
-                  >
-                    Baca Selengkapnya <ArrowRight size={13} />
-                  </Link>
-                </TiltSpotlightCard>
-              </ScrollReveal>
-            ))}
-          </div>
+          {recentBerita.length === 0 ? (
+            <EmptyState
+              title="Belum ada kabar berita terbaru"
+              description="Berita resmi dari Komisi 5 Media & Humas akan tampil di sini secara otomatis."
+            />
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+              {recentBerita.map((berita, i) => (
+                <ScrollReveal key={berita.id} preset="clipUp" delay={i * 0.08}>
+                  <TiltSpotlightCard cursorLabel="Baca" style={{ height: '100%' }}>
+                    {berita.thumbnail && (
+                      <div style={{ height: '140px', borderRadius: '10px', overflow: 'hidden', marginBottom: '0.85rem', background: 'var(--lavender-mist)' }}>
+                        <img
+                          src={berita.thumbnail}
+                          alt={berita.title}
+                          referrerPolicy="no-referrer"
+                          loading="lazy"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                      <Badge variant="ghost">{berita.category}</Badge>
+                      <span className="tabular-nums" style={{ fontFamily: 'var(--font-header)', fontSize: '0.72rem', color: 'var(--mid-grey)' }}>
+                        {formatDate(berita.date)}
+                      </span>
+                    </div>
+                    <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--deep-violet)', marginBottom: '0.5rem', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {berita.title}
+                    </h3>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--mid-grey)', lineHeight: 1.6, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', marginBottom: '1rem', flex: 1 }}>
+                      {berita.excerpt}
+                    </p>
+                    <Link
+                      to={`/beranda/berita/${berita.slug}`}
+                      style={{ fontFamily: 'var(--font-header)', fontSize: '0.8rem', color: 'var(--vistara-purple)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none', marginTop: 'auto' }}
+                    >
+                      Baca Selengkapnya <ArrowRight size={13} />
+                    </Link>
+                  </TiltSpotlightCard>
+                </ScrollReveal>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -523,37 +565,43 @@ export default function BerandaPage() {
                     Semua <ArrowRight size={13} />
                   </Link>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {upcomingEvents.map((event) => (
-                    <Link
-                      key={event.id}
-                      to={`/beranda/event?highlight=${encodeURIComponent(event.slug)}`}
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <motion.div
-                        whileHover={reducedMotion ? undefined : { x: 4 }}
-                        transition={{ duration: 0.2 }}
-                        className="card"
-                        style={{ padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'flex-start' }}
+                {upcomingEvents.length === 0 ? (
+                  <div className="card" style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--mid-grey)', fontSize: '0.86rem' }}>
+                    Belum ada agenda event terdekat. Jadwal resmi akan segera diperbarui.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {upcomingEvents.map((event) => (
+                      <Link
+                        key={event.id}
+                        to={`/beranda/event?highlight=${encodeURIComponent(event.slug)}`}
+                        style={{ textDecoration: 'none' }}
                       >
-                        <div style={{ background: 'var(--lavender-mist)', borderRadius: '10px', padding: '0.625rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Calendar size={18} style={{ color: 'var(--vistara-purple)' }} />
-                        </div>
-                        <div>
-                          <h4 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', color: 'var(--deep-violet)', lineHeight: 1.3, marginBottom: '0.25rem' }}>
-                            {event.title}
-                          </h4>
-                          <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.75rem', color: 'var(--mid-grey)' }}>
-                            {formatDate(event.date)} · {event.time} WITA
+                        <motion.div
+                          whileHover={reducedMotion ? undefined : { x: 4 }}
+                          transition={{ duration: 0.2 }}
+                          className="card"
+                          style={{ padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'flex-start' }}
+                        >
+                          <div style={{ background: 'var(--lavender-mist)', borderRadius: '10px', padding: '0.625rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Calendar size={18} style={{ color: 'var(--vistara-purple)' }} />
                           </div>
-                          <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.72rem', color: 'var(--light-grey)', marginTop: '0.2rem' }}>
-                            📍 {event.location}
+                          <div>
+                            <h4 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', color: 'var(--deep-violet)', lineHeight: 1.3, marginBottom: '0.25rem' }}>
+                              {event.title}
+                            </h4>
+                            <div className="tabular-nums" style={{ fontFamily: 'var(--font-header)', fontSize: '0.75rem', color: 'var(--mid-grey)' }}>
+                              {formatDate(event.date)} · {event.time} WITA
+                            </div>
+                            <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.72rem', color: 'var(--mid-grey)', marginTop: '0.2rem' }}>
+                              📍 {event.location}
+                            </div>
                           </div>
-                        </div>
-                      </motion.div>
-                    </Link>
-                  ))}
-                </div>
+                        </motion.div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             </ScrollReveal>
 
@@ -569,38 +617,44 @@ export default function BerandaPage() {
                     Semua <ArrowRight size={13} />
                   </Link>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {latestPrestasi.map((prestasi) => (
-                    <Link
-                      key={prestasi.id}
-                      to={`/beranda/prestasi/${prestasi.slug}`}
-                      style={{ textDecoration: 'none' }}
-                    >
-                      <motion.div
-                        whileHover={reducedMotion ? undefined : { x: 4 }}
-                        transition={{ duration: 0.2 }}
-                        className="card"
-                        style={{ padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'flex-start' }}
+                {latestPrestasi.length === 0 ? (
+                  <div className="card" style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--mid-grey)', fontSize: '0.86rem' }}>
+                    Belum ada catatan prestasi terbaru. Data prestasi resmi akan tampil di sini.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {latestPrestasi.map((prestasi) => (
+                      <Link
+                        key={prestasi.id}
+                        to={`/beranda/prestasi/${prestasi.slug}`}
+                        style={{ textDecoration: 'none' }}
                       >
-                        <div style={{ fontSize: '1.5rem', flexShrink: 0 }}>
-                          {prestasi.medali === 'emas' || prestasi.medali === 'juara1' ? '🥇'
-                            : prestasi.medali === 'perak' || prestasi.medali === 'juara2' ? '🥈'
-                            : prestasi.medali === 'perunggu' || prestasi.medali === 'juara3' ? '🥉'
-                            : '🏅'}
-                        </div>
-                        <div>
-                          <h4 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', color: 'var(--deep-violet)', lineHeight: 1.3, marginBottom: '0.25rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                            {prestasi.title}
-                          </h4>
-                          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            <Badge variant="ghost">{prestasi.tingkat}</Badge>
-                            <Badge variant="outline">{prestasi.tahun}</Badge>
+                        <motion.div
+                          whileHover={reducedMotion ? undefined : { x: 4 }}
+                          transition={{ duration: 0.2 }}
+                          className="card"
+                          style={{ padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'flex-start' }}
+                        >
+                          <div style={{ fontSize: '1.5rem', flexShrink: 0 }}>
+                            {prestasi.medali === 'emas' || prestasi.medali === 'juara1' ? '🥇'
+                              : prestasi.medali === 'perak' || prestasi.medali === 'juara2' ? '🥈'
+                              : prestasi.medali === 'perunggu' || prestasi.medali === 'juara3' ? '🥉'
+                              : '🏅'}
                           </div>
-                        </div>
-                      </motion.div>
-                    </Link>
-                  ))}
-                </div>
+                          <div>
+                            <h4 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', color: 'var(--deep-violet)', lineHeight: 1.3, marginBottom: '0.25rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                              {prestasi.title}
+                            </h4>
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <Badge variant="ghost">{prestasi.tingkat}</Badge>
+                              <Badge variant="outline">{prestasi.tahun}</Badge>
+                            </div>
+                          </div>
+                        </motion.div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             </ScrollReveal>
           </div>
@@ -685,48 +739,65 @@ export default function BerandaPage() {
             </MagneticWrapper>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
-            {featuredGaleri.map((album, i) => (
-              <ScrollReveal key={album.id} preset="fadeUp" delay={i * 0.06}>
-                <Link
-                  to={`/beranda/galeri/${album.slug}`}
-                  style={{ textDecoration: 'none', display: 'block' }}
-                  data-cursor="view"
-                  data-cursor-label="Galeri"
-                >
-                  <motion.div
-                    whileHover={reducedMotion ? undefined : { scale: 1.03, y: -4 }}
-                    transition={{ duration: 0.28, ease: EXPO_EASE }}
-                    style={{
-                      aspectRatio: '4/3',
-                      borderRadius: '14px',
-                      background: `linear-gradient(135deg, hsl(${260 + i * 10}, 50%, ${20 + i * 5}%) 0%, hsl(${280 + i * 10}, 60%, ${30 + i * 5}%) 100%)`,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'flex-end',
-                      padding: '1rem',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      boxShadow: '0 8px 24px rgba(45,27,105,0.14)',
-                    }}
+          {featuredGaleri.length === 0 ? (
+            <EmptyState
+              title="Belum ada album dokumentasi"
+              description="Dokumentasi foto kegiatan terbaru dari Komisi 5 akan tampil di sini."
+            />
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
+              {featuredGaleri.map((album, i) => (
+                <ScrollReveal key={album.id} preset="fadeUp" delay={i * 0.06}>
+                  <Link
+                    to={`/beranda/galeri/${album.slug}`}
+                    style={{ textDecoration: 'none', display: 'block' }}
+                    data-cursor="view"
+                    data-cursor-label="Galeri"
                   >
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.16 }}>
-                      <Image size={48} color="white" />
-                    </div>
-                    <div style={{ position: 'relative', zIndex: 1 }}>
-                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', color: 'white', lineHeight: 1.3, marginBottom: '0.25rem' }}>
-                        {album.title}
+                    <motion.div
+                      whileHover={reducedMotion ? undefined : { scale: 1.03, y: -4 }}
+                      transition={{ duration: 0.28, ease: EXPO_EASE }}
+                      style={{
+                        aspectRatio: '4/3',
+                        borderRadius: '14px',
+                        background: `linear-gradient(135deg, hsl(${260 + i * 10}, 50%, ${20 + (i % 4) * 5}%) 0%, hsl(${280 + i * 10}, 60%, ${30 + (i % 4) * 5}%) 100%)`,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'flex-end',
+                        padding: '1rem',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        boxShadow: '0 8px 24px rgba(45,27,105,0.14)',
+                      }}
+                    >
+                      {album.coverImage ? (
+                        <img
+                          src={album.coverImage}
+                          alt={album.title}
+                          referrerPolicy="no-referrer"
+                          loading="lazy"
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.16 }}>
+                          <Image size={48} color="white" />
+                        </div>
+                      )}
+                      <div style={{ position: 'relative', zIndex: 1, background: 'linear-gradient(0deg, rgba(15,10,30,0.82) 0%, transparent 100%)', margin: '-1rem', padding: '1.5rem 1rem 1rem' }}>
+                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', color: 'white', lineHeight: 1.3, marginBottom: '0.25rem' }}>
+                          {album.title}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span className="tabular-nums" style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{album.imageCount} foto</span>
+                          <span className="tabular-nums" style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.72)' }}>{formatDate(album.date)}</span>
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.75)' }}>{album.imageCount} foto</span>
-                        <span style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', color: 'rgba(255,255,255,0.65)' }}>{formatDate(album.date)}</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                </Link>
-              </ScrollReveal>
-            ))}
-          </div>
+                    </motion.div>
+                  </Link>
+                </ScrollReveal>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

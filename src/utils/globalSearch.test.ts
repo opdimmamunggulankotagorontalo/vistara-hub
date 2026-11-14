@@ -1,10 +1,47 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { searchGlobalContent } from './globalSearch';
+import type { BeritaItem, EventItem } from '../types';
 
-test('returns suggested news, events, and programs when query is empty', () => {
+const SAMPLE_BERITA: BeritaItem[] = [
+  {
+    id: 'b-1',
+    slug: 'pelantikan-vistara',
+    title: 'Pelantikan Pengurus OPDIM VISTARA Periode 2026–2027',
+    excerpt: 'Pengurus inti resmi dilantik di aula madrasah.',
+    category: 'Kegiatan',
+    date: '2026-10-12',
+    author: 'Komisi 5 Media',
+  },
+];
+
+const SAMPLE_EVENTS: EventItem[] = [
+  {
+    id: 'e-1',
+    slug: 'vistara-talks-3',
+    title: 'VISTARA Talks #3: Kepemimpinan Pelajar',
+    description: 'Diskusi interaktif siswa bersama narasumber.',
+    date: '2026-11-20',
+    time: '08:30',
+    location: 'Aula MAM',
+    category: 'Seminar',
+    status: 'upcoming',
+  },
+];
+
+test('returns program suggestions even when live berita and events are empty', () => {
   const res = searchGlobalContent('');
   assert.ok(res.results.length > 0);
+  assert.equal(res.counts.berita, 0);
+  assert.equal(res.counts.event, 0);
+  assert.ok(res.counts.program > 0);
+});
+
+test('returns suggested news, events, and programs when live datasets are provided', () => {
+  const res = searchGlobalContent('', 'all', 18, {
+    berita: SAMPLE_BERITA,
+    events: SAMPLE_EVENTS,
+  });
   assert.ok(res.counts.berita > 0);
   assert.ok(res.counts.event > 0);
   assert.ok(res.counts.program > 0);
@@ -12,7 +49,10 @@ test('returns suggested news, events, and programs when query is empty', () => {
 });
 
 test('finds matching news, events, and programs for shared keyword VISTARA', () => {
-  const res = searchGlobalContent('VISTARA');
+  const res = searchGlobalContent('VISTARA', 'all', 18, {
+    berita: SAMPLE_BERITA,
+    events: SAMPLE_EVENTS,
+  });
   const types = new Set(res.results.map((r) => r.type));
   assert.ok(types.has('berita'));
   assert.ok(types.has('event'));
@@ -20,7 +60,10 @@ test('finds matching news, events, and programs for shared keyword VISTARA', () 
 });
 
 test('filters results accurately by category tab', () => {
-  const onlyEvents = searchGlobalContent('VISTARA', 'event');
+  const onlyEvents = searchGlobalContent('VISTARA', 'event', 18, {
+    berita: SAMPLE_BERITA,
+    events: SAMPLE_EVENTS,
+  });
   assert.ok(onlyEvents.results.length > 0);
   assert.ok(onlyEvents.results.every((r) => r.type === 'event'));
   assert.ok(onlyEvents.counts.berita > 0);

@@ -112,6 +112,7 @@ export interface ArsipItem {
   tanggal: string;
   ukuran: string;
   deskripsi: string;
+  fileUrl?: string;
 }
 
 export interface KomisiInfo {
@@ -179,4 +180,41 @@ export interface PollingTopic {
   status: 'active' | 'closed';
   closesAt: string;
   options: PollingOption[];
+}
+
+export type AdminRole = 'root' | 'inti' | 'komisi4' | 'komisi5';
+
+export type AdminModule =
+  | 'accounts'
+  | 'events'
+  | 'arsip'
+  | 'prestasi'
+  | 'aspirasi'
+  | 'polling'
+  | 'berita'
+  | 'galeri';
+
+export interface AdminAccount {
+  id: string;
+  username: string;
+  fullName: string;
+  jabatan: string;
+  role: AdminRole;
+  isActive: boolean;
+  mustChangePassword: boolean;
+  createdAt: number | string;
+  updatedAt: number | string;
+  lastLoginAt?: number | string | null;
+}
+
+export interface AdminSession {
+  accountId: string;
+  username: string;
+  fullName: string;
+  jabatan: string;
+  role: AdminRole;
+  roleLabel: string;
+  token: string;
+  mustChangePassword: boolean;
+  loggedInAt: number;
 }

@@ -1,14 +1,50 @@
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, Building2, User, Trophy } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
-import { Badge } from '../../components/ui';
+import { Badge, LoadingState } from '../../components/ui';
 import ShareButtons from '../../components/ui/ShareButtons';
-import { prestasiData } from '../../data';
+import type { PrestasiItem } from '../../types';
+import { fetchPrestasiBySlug, subscribeToTableChanges } from '../../services/dataClient';
 import { ScrollReveal } from '../../components/motion/MotionPrimitives';
 
 export default function PrestasiDetail() {
   const { slug } = useParams<{ slug: string }>();
-  const item = prestasiData.find((p) => p.slug === slug);
+  const [item, setItem] = useState<PrestasiItem | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      if (!slug) {
+        setIsLoading(false);
+        return;
+      }
+      void fetchPrestasiBySlug(slug)
+        .then((found) => {
+          if (active) setItem(found);
+        })
+        .finally(() => {
+          if (active) setIsLoading(false);
+        });
+    };
+    load();
+    const unsub = subscribeToTableChanges('prestasi', load);
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, [slug]);
+
+  if (isLoading) {
+    return (
+      <div className="section-padding">
+        <div className="container">
+          <LoadingState />
+        </div>
+      </div>
+    );
+  }
 
   if (!item) {
     return (

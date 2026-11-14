@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Image as ImageIcon, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PageHeader } from '../../components/shared/PageHeader';
-import { galeriData } from '../../data';
+import { LoadingState } from '../../components/ui';
 import type { GaleriItem } from '../../types';
 import { ScrollReveal } from '../../components/motion/MotionPrimitives';
 import { useMotionSystem } from '../../components/motion/MotionProvider';
@@ -12,13 +12,18 @@ import { fetchGaleri, subscribeToTableChanges } from '../../services/dataClient'
 export default function GaleriDetailPage() {
   const { reducedMotion } = useMotionSystem();
   const { slug } = useParams<{ slug: string }>();
-  const [albums, setAlbums] = useState<GaleriItem[]>(galeriData);
+  const [albums, setAlbums] = useState<GaleriItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    fetchGaleri().then((items) => {
-      if (active) setAlbums(items);
-    });
+    fetchGaleri()
+      .then((items) => {
+        if (active) setAlbums(items);
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
     const unsubscribe = subscribeToTableChanges('gallery', () => {
       fetchGaleri().then((items) => {
         if (active) setAlbums(items);
@@ -35,8 +40,8 @@ export default function GaleriDetailPage() {
   const [showAll, setShowAll] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  const totalCount = album?.imageCount ?? 0;
-  const visibleCount = showAll ? totalCount : Math.min(totalCount, 12);
+  const totalCount = Math.max(1, album?.imageCount ?? 0);
+  const visibleCount = album ? (showAll ? totalCount : Math.min(totalCount, 12)) : 0;
   const photos = Array.from({ length: visibleCount }, (_, i) => i);
 
   useEffect(() => {
@@ -53,6 +58,14 @@ export default function GaleriDetailPage() {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [lightboxIndex, totalCount]);
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: '6rem 2rem' }}>
+        <LoadingState />
+      </div>
+    );
+  }
 
   if (!album) {
     return (
@@ -114,8 +127,17 @@ export default function GaleriDetailPage() {
                     border: 'none',
                   }}
                 >
-                  <ImageIcon size={28} style={{ color: 'rgba(255,255,255,0.22)' }} />
-                  <div style={{ position: 'absolute', bottom: '0.5rem', right: '0.5rem', fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'rgba(255,255,255,0.65)', background: 'rgba(15,10,30,0.35)', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                  {i === 0 && album.coverImage ? (
+                    <img
+                      src={album.coverImage}
+                      alt={album.title}
+                      referrerPolicy="no-referrer"
+                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <ImageIcon size={28} style={{ color: 'rgba(255,255,255,0.22)' }} />
+                  )}
+                  <div style={{ position: 'absolute', bottom: '0.5rem', right: '0.5rem', fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'rgba(255,255,255,0.85)', background: 'rgba(15,10,30,0.55)', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
                     {String(i + 1).padStart(2, '0')}
                   </div>
                 </motion.button>
@@ -200,6 +222,7 @@ export default function GaleriDetailPage() {
                     position: 'absolute',
                     top: '1rem',
                     right: '1rem',
+                    zIndex: 4,
                     width: '40px',
                     height: '40px',
                     borderRadius: '10px',
@@ -215,13 +238,31 @@ export default function GaleriDetailPage() {
                   <X size={18} />
                 </button>
 
-                <ImageIcon size={64} style={{ color: 'rgba(255,255,255,0.35)', marginBottom: '0.75rem' }} />
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.15rem', color: 'white', textAlign: 'center' }}>
-                  {album.title} — Dokumentasi #{String(lightboxIndex + 1).padStart(2, '0')}
-                </div>
-                <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.8rem', color: 'rgba(237, 230, 248, 0.75)', marginTop: '0.25rem' }}>
-                  {album.category} · Arsip Foto Resmi OPDIM VISTARA
-                </div>
+                {lightboxIndex === 0 && album.coverImage ? (
+                  <img
+                    src={album.coverImage}
+                    alt={album.title}
+                    referrerPolicy="no-referrer"
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      background: '#140B26',
+                    }}
+                  />
+                ) : (
+                  <>
+                    <ImageIcon size={64} style={{ color: 'rgba(255,255,255,0.35)', marginBottom: '0.75rem' }} />
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.15rem', color: 'white', textAlign: 'center' }}>
+                      {album.title} — Dokumentasi #{String(lightboxIndex + 1).padStart(2, '0')}
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.8rem', color: 'rgba(237, 230, 248, 0.75)', marginTop: '0.25rem' }}>
+                      {album.category} · Arsip Foto Resmi OPDIM VISTARA
+                    </div>
+                  </>
+                )}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.9rem 1.25rem', borderTop: '1px solid rgba(185, 154, 225, 0.16)' }}>

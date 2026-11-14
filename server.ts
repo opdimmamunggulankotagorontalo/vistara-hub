@@ -1,8 +1,9 @@
-import express from 'express';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
+import express, { type Request, type Response } from 'express';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,10 +11,31 @@ const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || 3000);
 const IS_PROD = process.env.NODE_ENV === 'production';
 
-// ── Ensure SQLite persistent data directory exists ──────────────
+type AdminRole = 'root' | 'inti' | 'komisi4' | 'komisi5';
+
+interface AuthenticatedAccount {
+  id: string;
+  username: string;
+  fullName: string;
+  jabatan: string;
+  role: AdminRole;
+  mustChangePassword: boolean;
+  isActive: boolean;
+}
+
+const VALID_ADMIN_ROLES = new Set<AdminRole>(['root', 'inti', 'komisi4', 'komisi5']);
+const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
+const LOCKOUT_DURATION_MS = 1000 * 60 * 5; // 5 minutes
+const MAX_FAILED_ATTEMPTS = 5;
+
+// ── Ensure SQLite persistent data & upload directories exist ─────
 const DATA_DIR = path.join(__dirname, 'data');
+const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
 const db = new DatabaseSync(path.join(DATA_DIR, 'vistara.db'));
@@ -66,179 +88,283 @@ db.exec(`
     votes INTEGER NOT NULL DEFAULT 0,
     sort_order INTEGER NOT NULL DEFAULT 0
   );
+
+  CREATE TABLE IF NOT EXISTS events (
+    id TEXT PRIMARY KEY,
+    slug TEXT UNIQUE NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    date TEXT NOT NULL,
+    time TEXT NOT NULL,
+    location TEXT NOT NULL,
+    category TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'upcoming',
+    thumbnail TEXT,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS gallery (
+    id TEXT PRIMARY KEY,
+    slug TEXT UNIQUE NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    category TEXT NOT NULL,
+    date TEXT NOT NULL,
+    cover_image TEXT NOT NULL DEFAULT '',
+    image_count INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS berita (
+    id TEXT PRIMARY KEY,
+    slug TEXT UNIQUE NOT NULL,
+    title TEXT NOT NULL,
+    excerpt TEXT NOT NULL,
+    category TEXT NOT NULL,
+    date TEXT NOT NULL,
+    author TEXT NOT NULL,
+    thumbnail TEXT,
+    content TEXT,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS arsip (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    jenis TEXT NOT NULL,
+    tanggal TEXT NOT NULL,
+    ukuran TEXT NOT NULL,
+    deskripsi TEXT NOT NULL,
+    file_url TEXT,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS prestasi (
+    id TEXT PRIMARY KEY,
+    slug TEXT UNIQUE NOT NULL,
+    title TEXT NOT NULL,
+    tingkat TEXT NOT NULL,
+    kategori TEXT NOT NULL,
+    peraih TEXT NOT NULL,
+    tahun TEXT NOT NULL,
+    medali TEXT NOT NULL,
+    penyelenggara TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
+  DROP TABLE IF EXISTS admin_roles;
+
+  CREATE TABLE IF NOT EXISTS admin_accounts (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    full_name TEXT NOT NULL,
+    jabatan TEXT NOT NULL,
+    role TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    must_change_password INTEGER NOT NULL DEFAULT 1,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    last_login_at INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS admin_sessions (
+    token_hash TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  );
 `);
 
-const SEED_ASPIRASI = [
-  {
-    id: 'asp-1',
-    kodeLacak: 'ASP-2026-1001',
-    jenis: 'Saran',
-    kategori: 'Fasilitas Madrasah',
-    judul: 'Penambahan Dispenser Air Minum di Lorong Kelas Lantai 2',
-    isi: 'Penyediaan dispenser air minum isi ulang di dekat ruang kelas lantai 2 agar santri dan siswa tidak perlu turun ke kantin setiap kali membutuhkan air minum saat jam istirahat.',
-    isAnonim: false,
-    namaPengirim: 'Siswa Kelas XI',
-    kelasPengirim: 'XI IPA 1',
-    tanggal: '2026-09-28',
-    status: 'Selesai',
-    tanggapanResmi: 'Aspirasi telah disampaikan kepada bagian sarana madrasah. Dispenser tambahan telah dipasang dan beroperasi di koridor barat lantai 2.',
-    penindaklanjut: 'Komisi 4 OPDIM & Waka Sarpras',
-    riwayatStatus: [
-      { status: 'Diterima', waktu: '28 Sep 2026', keterangan: 'Aspirasi masuk ke sistem Kotak Aspirasi Komisi 4.' },
-      { status: 'Ditinjau', waktu: '29 Sep 2026', keterangan: 'Diverifikasi kelayakannya oleh Komisi 4.' },
-      { status: 'Didiskusikan', waktu: '30 Sep 2026', keterangan: 'Dibahas dalam rapat koordinasi pengurus OPDIM.' },
-      { status: 'Tindak Lanjut', waktu: '02 Okt 2026', keterangan: 'Disampaikan secara resmi dalam audiensi bersama Waka Sarana & Prasarana.' },
-      { status: 'Selesai', waktu: '05 Okt 2026', keterangan: 'Dispenser terpasang dan dapat digunakan bersama.' },
-    ],
-    createdAt: 1759017600000,
-  },
-  {
-    id: 'asp-2',
-    kodeLacak: 'ASP-2026-1002',
-    jenis: 'Ide',
-    kategori: 'Kegiatan Siswa',
-    judul: 'Penguatan Mading Kreasi & Sesi Mentoring Belajar Sebaya',
-    isi: 'Mengusulkan diadakannya rubrik tips belajar mingguan di mading dan sesi belajar kelompok sebaya menjelang ujian semester.',
-    isAnonim: true,
-    namaPengirim: null,
-    kelasPengirim: null,
-    tanggal: '2026-10-01',
-    status: 'Tindak Lanjut',
-    tanggapanResmi: 'Ide disinkronkan dengan program Papan Informasi Edukasi Komisi 3 dan sedang dirumuskan format jadwal belajarnya.',
-    penindaklanjut: 'Komisi 4 & Komisi 3',
-    riwayatStatus: [
-      { status: 'Diterima', waktu: '01 Okt 2026', keterangan: 'Aspirasi diterima dan terdata secara anonim.' },
-      { status: 'Ditinjau', waktu: '02 Okt 2026', keterangan: 'Dinilai sangat konstruktif untuk akademik siswa.' },
-      { status: 'Didiskusikan', waktu: '04 Okt 2026', keterangan: 'Dikoordinasikan dengan Komisi 3 bagian Edukasi.' },
-      { status: 'Tindak Lanjut', waktu: '06 Okt 2026', keterangan: 'Penyusunan jadwal rubrik mading dan fasilitasi tutor sebaya.' },
-    ],
-    createdAt: 1759276800000,
-  },
-  {
-    id: 'asp-3',
-    kodeLacak: 'ASP-2026-1003',
-    jenis: 'Saran',
-    kategori: 'Kebersihan & Lingkungan',
-    judul: 'Wadah Sampah Khusus Daur Ulang untuk Trash to Cash',
-    isi: 'Agar program Trash to Cash Komisi 3 berjalan optimal, perlu ditandai tempat sampah khusus botol plastik di setiap sudut gazebo madrasah.',
-    isAnonim: false,
-    namaPengirim: 'Perwakilan Kelas X',
-    kelasPengirim: 'X-2',
-    tanggal: '2026-10-03',
-    status: 'Didiskusikan',
-    tanggapanResmi: 'Sedang dibahas bersama panitia Trash to Cash untuk pengadaan stiker penanda dan karung pilah.',
-    penindaklanjut: 'Komisi 4 & Tim Trash to Cash',
-    riwayatStatus: [
-      { status: 'Diterima', waktu: '03 Okt 2026', keterangan: 'Aspirasi diterima oleh tim piket aspirasi.' },
-      { status: 'Ditinjau', waktu: '04 Okt 2026', keterangan: 'Diteruskan ke Ketua Komisi 4 Nayla Syaqila Husain.' },
-      { status: 'Didiskusikan', waktu: '07 Okt 2026', keterangan: 'Sedang dimusyawarahkan pembiayaan pengadaan penanda bersama Bendahara.' },
-    ],
-    createdAt: 1759449600000,
-  },
-  {
-    id: 'asp-4',
-    kodeLacak: 'ASP-2026-1004',
-    jenis: 'Keluhan',
-    kategori: 'Fasilitas Madrasah',
-    judul: 'Optimalisasi Jaringan Internet WiFi di Perpustakaan',
-    isi: 'Kecepatan internet WiFi di perpustakaan sering melambat saat jam istirahat ketika banyak siswa mengakses referensi materi digital.',
-    isAnonim: true,
-    namaPengirim: null,
-    kelasPengirim: null,
-    tanggal: '2026-10-06',
-    status: 'Ditinjau',
-    tanggapanResmi: 'Dalam proses inventarisasi dan koordinasi bersama tim IT madrasah.',
-    penindaklanjut: 'Komisi 4 OPDIM',
-    riwayatStatus: [
-      { status: 'Diterima', waktu: '06 Okt 2026', keterangan: 'Laporan keluhan masuk ke Kotak Aspirasi.' },
-      { status: 'Ditinjau', waktu: '07 Okt 2026', keterangan: 'Komisi 4 melakukan verifikasi kendala sinyal di lokasi perpustakaan.' },
-    ],
-    createdAt: 1759708800000,
-  },
-];
+// Remove previously seeded dummy rows so the portal starts clean without dummy content
+db.exec(`
+  DELETE FROM aspirasi WHERE id IN ('asp-1', 'asp-2', 'asp-3', 'asp-4');
+  DELETE FROM polling_options WHERE poll_id IN ('poll-1', 'poll-2');
+  DELETE FROM polling_topics WHERE id IN ('poll-1', 'poll-2');
+`);
 
-// Seed baseline records if empty
-const existingCountRow = db.prepare('SELECT COUNT(*) AS count FROM aspirasi').get() as { count: number };
-if (existingCountRow.count === 0) {
-  const insertSeed = db.prepare(`
-    INSERT INTO aspirasi (
-      id, kode_lacak, jenis, kategori, judul, isi, is_anonim,
-      nama_pengirim, kelas_pengirim, tanggal, status, tanggapan_resmi,
-      penindaklanjut, riwayat_status, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  for (const row of SEED_ASPIRASI) {
-    insertSeed.run(
-      row.id,
-      row.kodeLacak,
-      row.jenis,
-      row.kategori,
-      row.judul,
-      row.isi,
-      row.isAnonim ? 1 : 0,
-      row.namaPengirim,
-      row.kelasPengirim,
-      row.tanggal,
-      row.status,
-      row.tanggapanResmi,
-      row.penindaklanjut,
-      JSON.stringify(row.riwayatStatus),
-      row.createdAt
-    );
+// ── Scrypt Password Hashing & Revocable Session Helpers ────────
+function hashPasswordScrypt(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt$${salt}$${derived}`;
+}
+
+function verifyPasswordScrypt(password: string, storedHash: string): boolean {
+  const parts = storedHash.split('$');
+  if (parts.length !== 3 || parts[0] !== 'scrypt') return false;
+  const [, salt, expectedHex] = parts;
+  if (!salt || !expectedHex) return false;
+  try {
+    const derived = crypto.scryptSync(password, salt, 64);
+    const expected = Buffer.from(expectedHex, 'hex');
+    if (derived.length !== expected.length) return false;
+    return crypto.timingSafeEqual(derived, expected);
+  } catch {
+    return false;
   }
 }
 
-const existingPollCountRow = db.prepare('SELECT COUNT(*) AS count FROM polling_topics').get() as { count: number };
-if (existingPollCountRow.count === 0) {
-  const seedPolls = [
-    {
-      id: 'poll-1',
-      slug: 'fokus-agenda-vistara-talks-3',
-      question: 'Tema utama apa yang paling kamu harapkan untuk VISTARA Talks #3?',
-      description: 'Hasil jajak pendapat ini menjadi dasar Komisi 2 & Komisi 4 menentukan topik dan narasumber sesi diskusi berikutnya.',
-      category: 'Kegiatan Siswa',
-      status: 'active',
-      closesAt: '30 November 2026',
-      createdAt: 1759708800000,
-      options: [
-        { id: 'poll-1-opt-1', label: 'Persiapan Olimpiade & Masuk PTN Favorit', votes: 64, sortOrder: 1 },
-        { id: 'poll-1-opt-2', label: 'Kewirausahaan Muda & Ekonomi Kreatif Pelajar', votes: 49, sortOrder: 2 },
-        { id: 'poll-1-opt-3', label: 'Literasi Digital, AI Produktif & Keamanan Siber', votes: 72, sortOrder: 3 },
-        { id: 'poll-1-opt-4', label: 'Kesehatan Mental & Manajemen Waktu Santri-Siswa', votes: 41, sortOrder: 4 },
-      ],
-    },
-    {
-      id: 'poll-2',
-      slug: 'prioritas-fasilitas-madrasah-triwulan-2',
-      question: 'Fasilitas madrasah mana yang perlu diprioritaskan pada audiensi Triwulan II?',
-      description: 'Pilihan siswa akan dirangkum oleh Komisi 4 dalam rekomendasi resmi ke bagian Sarana & Prasarana.',
-      category: 'Fasilitas Madrasah',
-      status: 'active',
-      closesAt: '15 Desember 2026',
-      createdAt: 1759622400000,
-      options: [
-        { id: 'poll-2-opt-1', label: 'Perluasan Area Baca & Stopkontak di Perpustakaan', votes: 83, sortOrder: 1 },
-        { id: 'poll-2-opt-2', label: 'Penambahan Loker Penyimpanan Barang per Kelas', votes: 58, sortOrder: 2 },
-        { id: 'poll-2-opt-3', label: 'Perbaikan Peneduh & Penerangan Area Gazebo', votes: 47, sortOrder: 3 },
-      ],
-    },
-  ];
+function hashSessionToken(rawToken: string): string {
+  return crypto.createHash('sha256').update(rawToken).digest('hex');
+}
 
-  const insertTopic = db.prepare(`
-    INSERT INTO polling_topics (id, slug, question, description, category, status, closes_at, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  const insertOption = db.prepare(`
-    INSERT INTO polling_options (id, poll_id, label, votes, sort_order)
-    VALUES (?, ?, ?, ?, ?)
-  `);
+function issueSessionForAccount(accountId: string): string {
+  const now = Date.now();
+  db.prepare('DELETE FROM admin_sessions WHERE expires_at <= ?').run(now);
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashSessionToken(rawToken);
+  db.prepare(
+    'INSERT INTO admin_sessions (token_hash, account_id, expires_at, created_at) VALUES (?, ?, ?, ?)'
+  ).run(tokenHash, accountId, now + SESSION_TTL_MS, now);
+  return rawToken;
+}
 
-  for (const p of seedPolls) {
-    insertTopic.run(p.id, p.slug, p.question, p.description, p.category, p.status, p.closesAt, p.createdAt);
-    for (const o of p.options) {
-      insertOption.run(o.id, p.id, o.label, o.votes, o.sortOrder);
-    }
+const ROLE_LABELS: Record<AdminRole, string> = {
+  root: 'Super Admin (Administrator Root)',
+  inti: 'Pengurus Inti OPDIM',
+  komisi4: 'Komisi 4 — Aspirasi Siswa',
+  komisi5: 'Komisi 5 — Media & Humas',
+};
+
+function getRoleLabel(role: AdminRole): string {
+  return ROLE_LABELS[role] || 'Pengurus OPDIM';
+}
+
+// Seed ONLY ONE initial Super Admin (Administrator Root) account if table is empty
+const accountCountRow = db.prepare('SELECT COUNT(*) AS count FROM admin_accounts').get() as { count: number };
+if (accountCountRow.count === 0) {
+  const now = Date.now();
+  db.prepare(`
+    INSERT INTO admin_accounts (
+      id, username, full_name, jabatan, role, password_hash, must_change_password, is_active, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
+  `).run(
+    'acc-root-001',
+    'superadmin',
+    'Administrator Root OPDIM',
+    'Administrator Root',
+    'root',
+    hashPasswordScrypt('VistaraRoot#2026'),
+    now,
+    now
+  );
+}
+
+interface SqliteAccountRow {
+  id: string;
+  username: string;
+  full_name: string;
+  jabatan: string;
+  role: AdminRole;
+  password_hash: string;
+  must_change_password: number;
+  is_active: number;
+  failed_attempts: number;
+  locked_until: number | null;
+  created_at: number;
+  updated_at: number;
+  last_login_at: number | null;
+}
+
+function mapAccountPublic(row: SqliteAccountRow) {
+  return {
+    id: row.id,
+    username: row.username,
+    fullName: row.full_name,
+    jabatan: row.jabatan,
+    role: row.role,
+    isActive: Boolean(row.is_active),
+    mustChangePassword: Boolean(row.must_change_password),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    lastLoginAt: row.last_login_at,
+  };
+}
+
+function extractRequestToken(req: Request): string {
+  const raw =
+    req.header('X-Admin-Token') ||
+    req.header('Authorization')?.replace(/^Bearer\s+/i, '') ||
+    '';
+  return raw.trim();
+}
+
+function resolveSessionFromToken(rawToken: string): AuthenticatedAccount | null {
+  if (!rawToken || rawToken.length < 16) return null;
+  const tokenHash = hashSessionToken(rawToken);
+  const now = Date.now();
+  const row = db
+    .prepare(`
+      SELECT a.id, a.username, a.full_name, a.jabatan, a.role, a.must_change_password, a.is_active
+      FROM admin_sessions s
+      JOIN admin_accounts a ON a.id = s.account_id
+      WHERE s.token_hash = ? AND s.expires_at > ? AND a.is_active = 1
+      LIMIT 1
+    `)
+    .get(tokenHash, now) as
+    | {
+        id: string;
+        username: string;
+        full_name: string;
+        jabatan: string;
+        role: AdminRole;
+        must_change_password: number;
+        is_active: number;
+      }
+    | undefined;
+
+  if (!row || !VALID_ADMIN_ROLES.has(row.role)) return null;
+  return {
+    id: row.id,
+    username: row.username,
+    fullName: row.full_name,
+    jabatan: row.jabatan,
+    role: row.role,
+    mustChangePassword: Boolean(row.must_change_password),
+    isActive: Boolean(row.is_active),
+  };
+}
+
+function requireAdminSession(
+  req: Request,
+  res: Response,
+  allowedRoles: AdminRole[],
+  allowPendingPassword = false
+): AuthenticatedAccount | null {
+  const token = extractRequestToken(req);
+  const account = resolveSessionFromToken(token);
+  if (!account) {
+    res.status(401).json({ error: 'Sesi admin tidak valid atau telah berakhir. Silakan masuk kembali.' });
+    return null;
   }
+  if (account.mustChangePassword && !allowPendingPassword) {
+    res.status(403).json({
+      error: 'Anda wajib mengganti password awal terlebih dahulu sebelum mengakses modul admin.',
+    });
+    return null;
+  }
+  if (!allowedRoles.includes(account.role)) {
+    res.status(403).json({ error: 'Akun Anda tidak memiliki izin untuk mengakses modul ini.' });
+    return null;
+  }
+  return account;
+}
+
+function slugifyServer(text: string): string {
+  return (
+    text
+      .toLowerCase()
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .slice(0, 72) || `item-${Date.now()}`
+  );
 }
 
 interface SqliteAspirasiRow {
@@ -288,10 +414,390 @@ function mapAspirasiRow(row: SqliteAspirasiRow) {
 
 const VALID_JENIS = new Set(['Saran', 'Kritik', 'Ide', 'Pertanyaan', 'Pujian', 'Keluhan']);
 const VALID_STATUS = new Set(['Diterima', 'Ditinjau', 'Didiskusikan', 'Tindak Lanjut', 'Selesai']);
+const VALID_EVENT_STATUS = new Set(['upcoming', 'ongoing', 'past']);
+const VALID_ARSIP_JENIS = new Set(['sk', 'notulen', 'dokumen', 'laporan']);
+const VALID_PRESTASI_TINGKAT = new Set(['nasional', 'provinsi', 'kabupaten', 'kota']);
+const VALID_PRESTASI_MEDALI = new Set([
+  'emas',
+  'perak',
+  'perunggu',
+  'juara1',
+  'juara2',
+  'juara3',
+  'peserta',
+]);
 
 async function startServer() {
   const app = express();
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: '16mb' }));
+  app.use('/uploads', express.static(UPLOADS_DIR));
+
+  // ── Admin Account Auth & Session Management ─────────────────
+  app.post('/api/admin/auth/login', (req, res) => {
+    try {
+      const username = String(req.body?.username || '').trim().toLowerCase();
+      const password = String(req.body?.password || '');
+      if (!username || !password) {
+        return res.status(400).json({ error: 'Username dan password wajib diisi.' });
+      }
+
+      const row = db
+        .prepare('SELECT * FROM admin_accounts WHERE username = ? LIMIT 1')
+        .get(username) as SqliteAccountRow | undefined;
+
+      if (!row) {
+        return res.status(401).json({ error: 'Username atau password tidak sesuai.' });
+      }
+
+      if (!row.is_active) {
+        return res.status(403).json({ error: 'Akun ini telah dinonaktifkan oleh Super Admin.' });
+      }
+
+      const now = Date.now();
+      if (row.locked_until && row.locked_until > now) {
+        const waitSec = Math.max(1, Math.ceil((row.locked_until - now) / 1000));
+        return res.status(423).json({
+          error: `Terlalu banyak percobaan masuk gagal. Coba lagi dalam ${waitSec} detik.`,
+        });
+      }
+
+      if (!verifyPasswordScrypt(password, row.password_hash)) {
+        const nextAttempts = row.failed_attempts + 1;
+        if (nextAttempts >= MAX_FAILED_ATTEMPTS) {
+          db.prepare(
+            'UPDATE admin_accounts SET failed_attempts = 0, locked_until = ?, updated_at = ? WHERE id = ?'
+          ).run(now + LOCKOUT_DURATION_MS, now, row.id);
+          return res.status(423).json({
+            error: 'Terlalu banyak percobaan gagal. Akun dikunci sementara selama 5 menit.',
+          });
+        }
+        db.prepare(
+          'UPDATE admin_accounts SET failed_attempts = ?, updated_at = ? WHERE id = ?'
+        ).run(nextAttempts, now, row.id);
+        return res.status(401).json({ error: 'Username atau password tidak sesuai.' });
+      }
+
+      const token = issueSessionForAccount(row.id);
+      db.prepare(
+        'UPDATE admin_accounts SET failed_attempts = 0, locked_until = NULL, last_login_at = ?, updated_at = ? WHERE id = ?'
+      ).run(now, now, row.id);
+
+      return res.json({
+        session: {
+          accountId: row.id,
+          username: row.username,
+          fullName: row.full_name,
+          jabatan: row.jabatan,
+          role: row.role,
+          roleLabel: getRoleLabel(row.role),
+          token,
+          mustChangePassword: Boolean(row.must_change_password),
+          loggedInAt: now,
+        },
+      });
+    } catch (error) {
+      console.error('POST /api/admin/auth/login failed:', error);
+      return res.status(500).json({ error: 'Gagal memverifikasi akun admin.' });
+    }
+  });
+
+  app.get('/api/admin/auth/session', (req, res) => {
+    const token = extractRequestToken(req);
+    const account = resolveSessionFromToken(token);
+    if (!account) {
+      return res.status(401).json({ error: 'Sesi tidak valid atau telah berakhir.' });
+    }
+    return res.json({
+      session: {
+        accountId: account.id,
+        username: account.username,
+        fullName: account.fullName,
+        jabatan: account.jabatan,
+        role: account.role,
+        roleLabel: getRoleLabel(account.role),
+        token,
+        mustChangePassword: account.mustChangePassword,
+        loggedInAt: Date.now(),
+      },
+    });
+  });
+
+  app.post('/api/admin/auth/logout', (req, res) => {
+    try {
+      const token = extractRequestToken(req);
+      if (token) {
+        db.prepare('DELETE FROM admin_sessions WHERE token_hash = ?').run(hashSessionToken(token));
+      }
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error('POST /api/admin/auth/logout failed:', error);
+      return res.status(500).json({ error: 'Gagal keluar dari sesi.' });
+    }
+  });
+
+  app.post('/api/admin/auth/change-password', (req, res) => {
+    const account = requireAdminSession(req, res, ['root', 'inti', 'komisi4', 'komisi5'], true);
+    if (!account) return;
+    try {
+      const currentPassword = String(req.body?.currentPassword || '');
+      const newPassword = String(req.body?.newPassword || '');
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: 'Password saat ini dan password baru wajib diisi.' });
+      }
+      if (newPassword.length < 8 || newPassword.length > 72) {
+        return res.status(400).json({ error: 'Password baru harus terdiri dari 8 hingga 72 karakter.' });
+      }
+      if (newPassword === currentPassword) {
+        return res.status(400).json({ error: 'Password baru tidak boleh sama dengan password lama.' });
+      }
+
+      const row = db
+        .prepare('SELECT * FROM admin_accounts WHERE id = ? LIMIT 1')
+        .get(account.id) as SqliteAccountRow | undefined;
+
+      if (!row || !verifyPasswordScrypt(currentPassword, row.password_hash)) {
+        return res.status(401).json({ error: 'Password saat ini tidak sesuai.' });
+      }
+
+      const now = Date.now();
+      db.prepare('DELETE FROM admin_sessions WHERE account_id = ?').run(row.id);
+      const nextToken = issueSessionForAccount(row.id);
+
+      db.prepare(
+        'UPDATE admin_accounts SET password_hash = ?, must_change_password = 0, updated_at = ? WHERE id = ?'
+      ).run(hashPasswordScrypt(newPassword), now, row.id);
+
+      return res.json({
+        session: {
+          accountId: row.id,
+          username: row.username,
+          fullName: row.full_name,
+          jabatan: row.jabatan,
+          role: row.role,
+          roleLabel: getRoleLabel(row.role),
+          token: nextToken,
+          mustChangePassword: false,
+          loggedInAt: now,
+        },
+      });
+    } catch (error) {
+      console.error('POST /api/admin/auth/change-password failed:', error);
+      return res.status(500).json({ error: 'Gagal memperbarui password akun.' });
+    }
+  });
+
+  // ── Super Admin Root Account CRUD ───────────────────────────
+  app.get('/api/admin/accounts', (req, res) => {
+    if (!requireAdminSession(req, res, ['root'])) return;
+    try {
+      const rows = db
+        .prepare(`
+          SELECT * FROM admin_accounts
+          ORDER BY CASE role WHEN 'root' THEN 1 WHEN 'inti' THEN 2 WHEN 'komisi4' THEN 3 ELSE 4 END, created_at ASC
+        `)
+        .all() as unknown as SqliteAccountRow[];
+      return res.json({ accounts: rows.map(mapAccountPublic) });
+    } catch (error) {
+      console.error('GET /api/admin/accounts failed:', error);
+      return res.status(500).json({ error: 'Gagal memuat daftar akun admin.' });
+    }
+  });
+
+  app.post('/api/admin/accounts', (req, res) => {
+    if (!requireAdminSession(req, res, ['root'])) return;
+    try {
+      const b = req.body ?? {};
+      const username = String(b.username || '').trim().toLowerCase();
+      const fullName = String(b.fullName || '').trim();
+      const jabatan = String(b.jabatan || '').trim();
+      const role = String(b.role || '').trim() as AdminRole;
+      const password = String(b.password || '');
+      const mustChangePassword = b.mustChangePassword !== false;
+
+      if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
+        return res.status(400).json({
+          error: 'Username harus 3–32 karakter (huruf kecil, angka, titik, _ atau -).',
+        });
+      }
+      if (!fullName || !jabatan) {
+        return res.status(400).json({ error: 'Nama lengkap dan jabatan pengurus wajib diisi.' });
+      }
+      if (!VALID_ADMIN_ROLES.has(role)) {
+        return res.status(400).json({ error: 'Divisi / peran akses tidak valid.' });
+      }
+      if (password.length < 8 || password.length > 72) {
+        return res.status(400).json({ error: 'Password awal harus terdiri dari 8 hingga 72 karakter.' });
+      }
+
+      const existing = db
+        .prepare('SELECT id FROM admin_accounts WHERE username = ? LIMIT 1')
+        .get(username);
+      if (existing) {
+        return res.status(409).json({ error: `Username "${username}" sudah digunakan.` });
+      }
+
+      const now = Date.now();
+      const id = `acc-${now}-${Math.floor(100 + Math.random() * 900)}`;
+
+      db.prepare(`
+        INSERT INTO admin_accounts (
+          id, username, full_name, jabatan, role, password_hash, must_change_password, is_active, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+      `).run(
+        id,
+        username,
+        fullName,
+        jabatan,
+        role,
+        hashPasswordScrypt(password),
+        mustChangePassword ? 1 : 0,
+        now,
+        now
+      );
+
+      const created = db
+        .prepare('SELECT * FROM admin_accounts WHERE id = ?')
+        .get(id) as SqliteAccountRow;
+
+      return res.status(201).json({ account: mapAccountPublic(created) });
+    } catch (error) {
+      console.error('POST /api/admin/accounts failed:', error);
+      return res.status(500).json({ error: 'Gagal membuat akun pengurus baru.' });
+    }
+  });
+
+  app.patch('/api/admin/accounts/:id', (req, res) => {
+    const actor = requireAdminSession(req, res, ['root']);
+    if (!actor) return;
+    try {
+      const targetId = String(req.params.id || '').trim();
+      const target = db
+        .prepare('SELECT * FROM admin_accounts WHERE id = ? LIMIT 1')
+        .get(targetId) as SqliteAccountRow | undefined;
+
+      if (!target) {
+        return res.status(404).json({ error: 'Akun pengurus tidak ditemukan.' });
+      }
+
+      const b = req.body ?? {};
+      const nextFullName = b.fullName !== undefined ? String(b.fullName).trim() : target.full_name;
+      const nextJabatan = b.jabatan !== undefined ? String(b.jabatan).trim() : target.jabatan;
+      const nextRole =
+        b.role !== undefined && VALID_ADMIN_ROLES.has(String(b.role) as AdminRole)
+          ? (String(b.role) as AdminRole)
+          : target.role;
+      const nextIsActive =
+        b.isActive !== undefined ? Boolean(b.isActive) : Boolean(target.is_active);
+      const nextNewPassword = b.newPassword !== undefined ? String(b.newPassword) : '';
+      const nextMustChange =
+        b.mustChangePassword !== undefined
+          ? Boolean(b.mustChangePassword)
+          : Boolean(target.must_change_password);
+
+      if (targetId === actor.id && !nextIsActive) {
+        return res.status(400).json({
+          error: 'Anda tidak dapat menonaktifkan akun Super Admin yang sedang digunakan.',
+        });
+      }
+      if (!nextFullName || !nextJabatan) {
+        return res.status(400).json({ error: 'Nama lengkap dan jabatan tidak boleh kosong.' });
+      }
+      if (nextNewPassword && (nextNewPassword.length < 8 || nextNewPassword.length > 72)) {
+        return res.status(400).json({ error: 'Password baru minimal 8 karakter dan maksimal 72 karakter.' });
+      }
+
+      const now = Date.now();
+      const nextHash = nextNewPassword ? hashPasswordScrypt(nextNewPassword) : target.password_hash;
+
+      db.prepare(`
+        UPDATE admin_accounts
+        SET full_name = ?, jabatan = ?, role = ?, is_active = ?, password_hash = ?, must_change_password = ?, updated_at = ?
+        WHERE id = ?
+      `).run(
+        nextFullName,
+        nextJabatan,
+        nextRole,
+        nextIsActive ? 1 : 0,
+        nextHash,
+        nextMustChange ? 1 : 0,
+        now,
+        targetId
+      );
+
+      if (!nextIsActive || nextNewPassword) {
+        db.prepare('DELETE FROM admin_sessions WHERE account_id = ?').run(targetId);
+      }
+
+      const updated = db
+        .prepare('SELECT * FROM admin_accounts WHERE id = ?')
+        .get(targetId) as SqliteAccountRow;
+
+      return res.json({ account: mapAccountPublic(updated) });
+    } catch (error) {
+      console.error('PATCH /api/admin/accounts/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal memperbarui data akun pengurus.' });
+    }
+  });
+
+  app.delete('/api/admin/accounts/:id', (req, res) => {
+    const actor = requireAdminSession(req, res, ['root']);
+    if (!actor) return;
+    try {
+      const targetId = String(req.params.id || '').trim();
+      if (targetId === actor.id) {
+        return res.status(400).json({
+          error: 'Anda tidak dapat menghapus akun Super Admin yang sedang aktif digunakan.',
+        });
+      }
+      db.prepare('DELETE FROM admin_sessions WHERE account_id = ?').run(targetId);
+      const result = db.prepare('DELETE FROM admin_accounts WHERE id = ?').run(targetId);
+      if (result.changes === 0) {
+        return res.status(404).json({ error: 'Akun tidak ditemukan.' });
+      }
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error('DELETE /api/admin/accounts/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal menghapus akun pengurus.' });
+    }
+  });
+
+  // ── Media & File Upload (Local fallback for Supabase Storage) ─
+  app.post('/api/upload', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi4', 'komisi5'])) return;
+    try {
+      const folderRaw = String(req.body?.folder || 'media').replace(/[^a-zA-Z0-9_-]/g, '');
+      const folder = folderRaw || 'media';
+      const fileNameRaw = String(req.body?.fileName || `upload-${Date.now()}.webp`);
+      const base64Raw = String(req.body?.base64 || '');
+      if (!base64Raw) {
+        return res.status(400).json({ error: 'Berkas unggahan kosong.' });
+      }
+
+      const safeFileName = `${Date.now()}-${path.basename(fileNameRaw).replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+      const targetFolder = path.join(UPLOADS_DIR, folder);
+      if (!fs.existsSync(targetFolder)) {
+        fs.mkdirSync(targetFolder, { recursive: true });
+      }
+
+      const cleanBase64 = base64Raw.includes('base64,') ? base64Raw.split('base64,')[1] : base64Raw;
+      const buffer = Buffer.from(cleanBase64, 'base64');
+      if (buffer.byteLength > 12 * 1024 * 1024) {
+        return res.status(400).json({ error: 'Ukuran berkas melebihi batas 12 MB.' });
+      }
+
+      fs.writeFileSync(path.join(targetFolder, safeFileName), buffer);
+      const sizeKb = Math.round(buffer.byteLength / 1024);
+      const sizeText = sizeKb >= 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${Math.max(1, sizeKb)} KB`;
+
+      return res.status(201).json({
+        url: `/uploads/${folder}/${safeFileName}`,
+        sizeText,
+      });
+    } catch (error) {
+      console.error('POST /api/upload failed:', error);
+      return res.status(500).json({ error: 'Gagal mengunggah berkas.' });
+    }
+  });
 
   // ── Aspirasi REST Endpoints ─────────────────────────────────
   app.get('/api/aspirasi', (_req, res) => {
@@ -401,12 +907,14 @@ async function startServer() {
   });
 
   app.patch('/api/aspirasi/:code/status', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi4'])) return;
     try {
       const code = String(req.params.code || '').trim().toUpperCase();
       const body = req.body ?? {};
       const status = String(body.status || '').trim();
       const keterangan = String(body.keterangan || '').trim();
-      const tanggapanResmi = body.tanggapanResmi ? String(body.tanggapanResmi).trim() : undefined;
+      const tanggapanResmi = body.tanggapanResmi !== undefined ? String(body.tanggapanResmi).trim() : undefined;
+      const penindaklanjut = body.penindaklanjut !== undefined ? String(body.penindaklanjut).trim() : undefined;
 
       if (!VALID_STATUS.has(status)) {
         return res.status(400).json({ error: 'Status tindak lanjut tidak valid.' });
@@ -438,11 +946,12 @@ async function startServer() {
 
       db.prepare(`
         UPDATE aspirasi
-        SET status = ?, tanggapan_resmi = ?, riwayat_status = ?
+        SET status = ?, tanggapan_resmi = ?, penindaklanjut = ?, riwayat_status = ?
         WHERE id = ?
       `).run(
         status,
         tanggapanResmi ?? existing.tanggapanResmi ?? null,
+        penindaklanjut ?? existing.penindaklanjut ?? null,
         JSON.stringify(updatedHistory),
         existing.id
       );
@@ -452,6 +961,29 @@ async function startServer() {
     } catch (error) {
       console.error('PATCH /api/aspirasi/:code/status failed:', error);
       return res.status(500).json({ error: 'Gagal memperbarui status aspirasi.' });
+    }
+  });
+
+  app.delete('/api/aspirasi', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi4'])) return;
+    try {
+      db.prepare('DELETE FROM aspirasi').run();
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error('DELETE /api/aspirasi failed:', error);
+      return res.status(500).json({ error: 'Gagal mengosongkan data aspirasi.' });
+    }
+  });
+
+  app.delete('/api/aspirasi/:id', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi4'])) return;
+    try {
+      const id = String(req.params.id || '').trim();
+      db.prepare('DELETE FROM aspirasi WHERE id = ?').run(id);
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error('DELETE /api/aspirasi/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal menghapus aspirasi.' });
     }
   });
 
@@ -556,6 +1088,82 @@ async function startServer() {
     }
   });
 
+  app.post('/api/polling', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi4'])) return;
+    try {
+      const body = req.body ?? {};
+      const question = String(body.question || '').trim();
+      const description = String(body.description || '').trim();
+      const category = String(body.category || 'Kegiatan Siswa').trim();
+      const closesAt = String(body.closesAt || '').trim();
+      const optionLabels = Array.isArray(body.options)
+        ? body.options.map((v: unknown) => String(v || '').trim()).filter(Boolean)
+        : [];
+
+      if (!question || !closesAt || optionLabels.length < 2) {
+        return res.status(400).json({ error: 'Pertanyaan, batas waktu, dan minimal 2 opsi wajib diisi.' });
+      }
+
+      const id = `poll-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const slug = `${slugifyServer(question)}-${Math.floor(100 + Math.random() * 900)}`;
+
+      db.prepare(`
+        INSERT INTO polling_topics (id, slug, question, description, category, status, closes_at, created_at)
+        VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
+      `).run(id, slug, question, description || question, category, closesAt, Date.now());
+
+      const insertOpt = db.prepare(
+        'INSERT INTO polling_options (id, poll_id, label, votes, sort_order) VALUES (?, ?, ?, 0, ?)'
+      );
+      optionLabels.forEach((label, idx) => {
+        insertOpt.run(`${id}-opt-${idx + 1}`, id, label, idx + 1);
+      });
+
+      return res.status(201).json({ polls: getHydratedPolls() });
+    } catch (error) {
+      console.error('POST /api/polling failed:', error);
+      return res.status(500).json({ error: 'Gagal membuat topik polling.' });
+    }
+  });
+
+  app.patch('/api/polling/:pollId/status', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi4'])) return;
+    try {
+      const pollId = String(req.params.pollId || '').trim();
+      const status = req.body?.status === 'closed' ? 'closed' : 'active';
+      db.prepare('UPDATE polling_topics SET status = ? WHERE id = ?').run(status, pollId);
+      return res.json({ polls: getHydratedPolls() });
+    } catch (error) {
+      console.error('PATCH /api/polling/:pollId/status failed:', error);
+      return res.status(500).json({ error: 'Gagal memperbarui status polling.' });
+    }
+  });
+
+  app.delete('/api/polling', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi4'])) return;
+    try {
+      db.prepare('DELETE FROM polling_options').run();
+      db.prepare('DELETE FROM polling_topics').run();
+      return res.json({ polls: [] });
+    } catch (error) {
+      console.error('DELETE /api/polling failed:', error);
+      return res.status(500).json({ error: 'Gagal mengosongkan seluruh data polling.' });
+    }
+  });
+
+  app.delete('/api/polling/:pollId', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi4'])) return;
+    try {
+      const pollId = String(req.params.pollId || '').trim();
+      db.prepare('DELETE FROM polling_options WHERE poll_id = ?').run(pollId);
+      db.prepare('DELETE FROM polling_topics WHERE id = ?').run(pollId);
+      return res.json({ polls: getHydratedPolls() });
+    } catch (error) {
+      console.error('DELETE /api/polling/:pollId failed:', error);
+      return res.status(500).json({ error: 'Gagal menghapus topik polling.' });
+    }
+  });
+
   app.post('/api/polling/:pollId/vote', (req, res) => {
     try {
       const pollId = String(req.params.pollId || '').trim();
@@ -584,6 +1192,474 @@ async function startServer() {
     } catch (error) {
       console.error('POST /api/polling/:pollId/vote failed:', error);
       return res.status(500).json({ error: 'Gagal mengirim suara polling.' });
+    }
+  });
+
+  // ── Berita REST Endpoints ───────────────────────────────────
+  app.get('/api/berita', (_req, res) => {
+    try {
+      const rows = db.prepare('SELECT id, slug, title, excerpt, category, date, author, thumbnail, content FROM berita ORDER BY date DESC, created_at DESC').all();
+      return res.json({ records: rows });
+    } catch (error) {
+      console.error('GET /api/berita failed:', error);
+      return res.status(500).json({ error: 'Gagal memuat daftar berita.' });
+    }
+  });
+
+  app.post('/api/berita', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi5'])) return;
+    try {
+      const b = req.body ?? {};
+      const title = String(b.title || '').trim();
+      const excerpt = String(b.excerpt || '').trim();
+      const category = String(b.category || 'Kegiatan').trim();
+      const date = String(b.date || new Date().toISOString().slice(0, 10)).trim();
+      const author = String(b.author || 'Komisi 5 Media').trim();
+      const thumbnail = b.thumbnail ? String(b.thumbnail).trim() : null;
+      const content = b.content ? String(b.content).trim() : null;
+      if (!title || !excerpt) {
+        return res.status(400).json({ error: 'Judul dan ringkasan berita wajib diisi.' });
+      }
+      const id = `berita-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const slug = `${slugifyServer(title)}-${Math.floor(100 + Math.random() * 900)}`;
+
+      db.prepare(`
+        INSERT INTO berita (id, slug, title, excerpt, category, date, author, thumbnail, content, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, slug, title, excerpt, category, date, author, thumbnail, content, Date.now());
+
+      const created = db.prepare('SELECT id, slug, title, excerpt, category, date, author, thumbnail, content FROM berita WHERE id = ?').get(id);
+      return res.status(201).json({ record: created });
+    } catch (error) {
+      console.error('POST /api/berita failed:', error);
+      return res.status(500).json({ error: 'Gagal menerbitkan berita.' });
+    }
+  });
+
+  app.put('/api/berita/:id', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi5'])) return;
+    try {
+      const id = String(req.params.id || '').trim();
+      const b = req.body ?? {};
+      const title = String(b.title || '').trim();
+      const excerpt = String(b.excerpt || '').trim();
+      const category = String(b.category || 'Kegiatan').trim();
+      const date = String(b.date || '').trim();
+      const author = String(b.author || '').trim();
+      const thumbnail = b.thumbnail ? String(b.thumbnail).trim() : null;
+      const content = b.content ? String(b.content).trim() : null;
+      if (!title || !excerpt) {
+        return res.status(400).json({ error: 'Judul dan ringkasan berita wajib diisi.' });
+      }
+
+      db.prepare(`
+        UPDATE berita SET title = ?, excerpt = ?, category = ?, date = ?, author = ?, thumbnail = ?, content = ?
+        WHERE id = ?
+      `).run(title, excerpt, category, date, author, thumbnail, content, id);
+
+      const updated = db.prepare('SELECT id, slug, title, excerpt, category, date, author, thumbnail, content FROM berita WHERE id = ?').get(id);
+      return res.json({ record: updated });
+    } catch (error) {
+      console.error('PUT /api/berita/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal memperbarui berita.' });
+    }
+  });
+
+  app.delete('/api/berita/:id', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi5'])) return;
+    try {
+      db.prepare('DELETE FROM berita WHERE id = ?').run(String(req.params.id || '').trim());
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error('DELETE /api/berita/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal menghapus berita.' });
+    }
+  });
+
+  // ── Galeri REST Endpoints ───────────────────────────────────
+  app.get('/api/galeri', (_req, res) => {
+    try {
+      const rows = db.prepare('SELECT id, slug, title, description, category, date, cover_image, image_count FROM gallery ORDER BY date DESC, created_at DESC').all() as Array<{
+        id: string;
+        slug: string;
+        title: string;
+        description: string;
+        category: string;
+        date: string;
+        cover_image: string;
+        image_count: number;
+      }>;
+      return res.json({
+        records: rows.map((r) => ({
+          id: r.id,
+          slug: r.slug,
+          title: r.title,
+          description: r.description,
+          category: r.category,
+          date: r.date,
+          coverImage: r.cover_image,
+          imageCount: Number(r.image_count),
+        })),
+      });
+    } catch (error) {
+      console.error('GET /api/galeri failed:', error);
+      return res.status(500).json({ error: 'Gagal memuat data galeri.' });
+    }
+  });
+
+  app.post('/api/galeri', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi5'])) return;
+    try {
+      const b = req.body ?? {};
+      const title = String(b.title || '').trim();
+      const description = String(b.description || '').trim();
+      const category = String(b.category || 'Kegiatan').trim();
+      const date = String(b.date || new Date().toISOString().slice(0, 10)).trim();
+      const coverImage = String(b.coverImage || '').trim();
+      const imageCount = Math.max(1, Number(b.imageCount) || 1);
+      if (!title || !description) {
+        return res.status(400).json({ error: 'Judul dan deskripsi album wajib diisi.' });
+      }
+      const id = `gal-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const slug = `${slugifyServer(title)}-${Math.floor(100 + Math.random() * 900)}`;
+
+      db.prepare(`
+        INSERT INTO gallery (id, slug, title, description, category, date, cover_image, image_count, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, slug, title, description, category, date, coverImage, imageCount, Date.now());
+
+      return res.status(201).json({
+        record: { id, slug, title, description, category, date, coverImage, imageCount },
+      });
+    } catch (error) {
+      console.error('POST /api/galeri failed:', error);
+      return res.status(500).json({ error: 'Gagal menyimpan album galeri.' });
+    }
+  });
+
+  app.put('/api/galeri/:id', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi5'])) return;
+    try {
+      const id = String(req.params.id || '').trim();
+      const b = req.body ?? {};
+      const title = String(b.title || '').trim();
+      const description = String(b.description || '').trim();
+      const category = String(b.category || 'Kegiatan').trim();
+      const date = String(b.date || '').trim();
+      const coverImage = String(b.coverImage || '').trim();
+      const imageCount = Math.max(1, Number(b.imageCount) || 1);
+
+      db.prepare(`
+        UPDATE gallery SET title = ?, description = ?, category = ?, date = ?, cover_image = ?, image_count = ?
+        WHERE id = ?
+      `).run(title, description, category, date, coverImage, imageCount, id);
+
+      const updated = db.prepare('SELECT id, slug, title, description, category, date, cover_image, image_count FROM gallery WHERE id = ?').get(id) as {
+        id: string;
+        slug: string;
+        title: string;
+        description: string;
+        category: string;
+        date: string;
+        cover_image: string;
+        image_count: number;
+      };
+      return res.json({
+        record: {
+          id: updated.id,
+          slug: updated.slug,
+          title: updated.title,
+          description: updated.description,
+          category: updated.category,
+          date: updated.date,
+          coverImage: updated.cover_image,
+          imageCount: Number(updated.image_count),
+        },
+      });
+    } catch (error) {
+      console.error('PUT /api/galeri/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal memperbarui album galeri.' });
+    }
+  });
+
+  app.delete('/api/galeri/:id', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi5'])) return;
+    try {
+      db.prepare('DELETE FROM gallery WHERE id = ?').run(String(req.params.id || '').trim());
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error('DELETE /api/galeri/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal menghapus album galeri.' });
+    }
+  });
+
+  // ── Events REST Endpoints ───────────────────────────────────
+  app.get('/api/events', (_req, res) => {
+    try {
+      const rows = db.prepare('SELECT id, slug, title, description, date, time, location, category, status, thumbnail FROM events ORDER BY date DESC, created_at DESC').all();
+      return res.json({ records: rows });
+    } catch (error) {
+      console.error('GET /api/events failed:', error);
+      return res.status(500).json({ error: 'Gagal memuat agenda event.' });
+    }
+  });
+
+  app.post('/api/events', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti'])) return;
+    try {
+      const b = req.body ?? {};
+      const title = String(b.title || '').trim();
+      const description = String(b.description || '').trim();
+      const date = String(b.date || '').trim();
+      const time = String(b.time || '08:00').trim();
+      const location = String(b.location || '').trim();
+      const category = String(b.category || 'Agenda OPDIM').trim();
+      const status = VALID_EVENT_STATUS.has(String(b.status)) ? String(b.status) : 'upcoming';
+      const thumbnail = b.thumbnail ? String(b.thumbnail).trim() : null;
+      if (!title || !description || !date || !location) {
+        return res.status(400).json({ error: 'Judul, deskripsi, tanggal, dan lokasi wajib diisi.' });
+      }
+      const id = `evt-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const slug = `${slugifyServer(title)}-${Math.floor(100 + Math.random() * 900)}`;
+
+      db.prepare(`
+        INSERT INTO events (id, slug, title, description, date, time, location, category, status, thumbnail, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, slug, title, description, date, time, location, category, status, thumbnail, Date.now());
+
+      const created = db.prepare('SELECT id, slug, title, description, date, time, location, category, status, thumbnail FROM events WHERE id = ?').get(id);
+      return res.status(201).json({ record: created });
+    } catch (error) {
+      console.error('POST /api/events failed:', error);
+      return res.status(500).json({ error: 'Gagal membuat agenda event.' });
+    }
+  });
+
+  app.put('/api/events/:id', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti'])) return;
+    try {
+      const id = String(req.params.id || '').trim();
+      const b = req.body ?? {};
+      const title = String(b.title || '').trim();
+      const description = String(b.description || '').trim();
+      const date = String(b.date || '').trim();
+      const time = String(b.time || '08:00').trim();
+      const location = String(b.location || '').trim();
+      const category = String(b.category || 'Agenda OPDIM').trim();
+      const status = VALID_EVENT_STATUS.has(String(b.status)) ? String(b.status) : 'upcoming';
+      const thumbnail = b.thumbnail ? String(b.thumbnail).trim() : null;
+
+      db.prepare(`
+        UPDATE events SET title = ?, description = ?, date = ?, time = ?, location = ?, category = ?, status = ?, thumbnail = ?
+        WHERE id = ?
+      `).run(title, description, date, time, location, category, status, thumbnail, id);
+
+      const updated = db.prepare('SELECT id, slug, title, description, date, time, location, category, status, thumbnail FROM events WHERE id = ?').get(id);
+      return res.json({ record: updated });
+    } catch (error) {
+      console.error('PUT /api/events/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal memperbarui agenda event.' });
+    }
+  });
+
+  app.delete('/api/events/:id', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti'])) return;
+    try {
+      db.prepare('DELETE FROM events WHERE id = ?').run(String(req.params.id || '').trim());
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error('DELETE /api/events/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal menghapus event.' });
+    }
+  });
+
+  // ── Arsip REST Endpoints ────────────────────────────────────
+  app.get('/api/arsip', (_req, res) => {
+    try {
+      const rows = db.prepare('SELECT id, title, jenis, tanggal, ukuran, deskripsi, file_url FROM arsip ORDER BY created_at DESC').all() as Array<{
+        id: string;
+        title: string;
+        jenis: string;
+        tanggal: string;
+        ukuran: string;
+        deskripsi: string;
+        file_url: string | null;
+      }>;
+      return res.json({
+        records: rows.map((r) => ({
+          id: r.id,
+          title: r.title,
+          jenis: r.jenis,
+          tanggal: r.tanggal,
+          ukuran: r.ukuran,
+          deskripsi: r.deskripsi,
+          fileUrl: r.file_url ?? undefined,
+        })),
+      });
+    } catch (error) {
+      console.error('GET /api/arsip failed:', error);
+      return res.status(500).json({ error: 'Gagal memuat dokumen arsip.' });
+    }
+  });
+
+  app.post('/api/arsip', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti'])) return;
+    try {
+      const b = req.body ?? {};
+      const title = String(b.title || '').trim();
+      const jenis = VALID_ARSIP_JENIS.has(String(b.jenis)) ? String(b.jenis) : 'dokumen';
+      const tanggal = String(b.tanggal || '').trim();
+      const ukuran = String(b.ukuran || 'PDF').trim();
+      const deskripsi = String(b.deskripsi || '').trim();
+      const fileUrl = b.fileUrl ? String(b.fileUrl).trim() : null;
+      if (!title || !deskripsi || !tanggal) {
+        return res.status(400).json({ error: 'Judul, tanggal, dan deskripsi arsip wajib diisi.' });
+      }
+      const id = `arsip-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+
+      db.prepare(`
+        INSERT INTO arsip (id, title, jenis, tanggal, ukuran, deskripsi, file_url, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, title, jenis, tanggal, ukuran, deskripsi, fileUrl, Date.now());
+
+      return res.status(201).json({
+        record: { id, title, jenis, tanggal, ukuran, deskripsi, fileUrl: fileUrl ?? undefined },
+      });
+    } catch (error) {
+      console.error('POST /api/arsip failed:', error);
+      return res.status(500).json({ error: 'Gagal menerbitkan dokumen arsip.' });
+    }
+  });
+
+  app.put('/api/arsip/:id', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti'])) return;
+    try {
+      const id = String(req.params.id || '').trim();
+      const b = req.body ?? {};
+      const title = String(b.title || '').trim();
+      const jenis = VALID_ARSIP_JENIS.has(String(b.jenis)) ? String(b.jenis) : 'dokumen';
+      const tanggal = String(b.tanggal || '').trim();
+      const ukuran = String(b.ukuran || 'PDF').trim();
+      const deskripsi = String(b.deskripsi || '').trim();
+      const fileUrl = b.fileUrl ? String(b.fileUrl).trim() : null;
+
+      db.prepare(`
+        UPDATE arsip SET title = ?, jenis = ?, tanggal = ?, ukuran = ?, deskripsi = ?, file_url = ?
+        WHERE id = ?
+      `).run(title, jenis, tanggal, ukuran, deskripsi, fileUrl, id);
+
+      return res.json({
+        record: { id, title, jenis, tanggal, ukuran, deskripsi, fileUrl: fileUrl ?? undefined },
+      });
+    } catch (error) {
+      console.error('PUT /api/arsip/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal memperbarui dokumen arsip.' });
+    }
+  });
+
+  app.delete('/api/arsip/:id', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti'])) return;
+    try {
+      db.prepare('DELETE FROM arsip WHERE id = ?').run(String(req.params.id || '').trim());
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error('DELETE /api/arsip/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal menghapus dokumen arsip.' });
+    }
+  });
+
+  // ── Prestasi REST Endpoints ─────────────────────────────────
+  app.get('/api/prestasi', (_req, res) => {
+    try {
+      const rows = db
+        .prepare('SELECT id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara FROM prestasi ORDER BY tahun DESC, created_at DESC')
+        .all();
+      return res.json({ records: rows });
+    } catch (error) {
+      console.error('GET /api/prestasi failed:', error);
+      return res.status(500).json({ error: 'Gagal memuat data prestasi.' });
+    }
+  });
+
+  app.post('/api/prestasi', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi5'])) return;
+    try {
+      const b = req.body ?? {};
+      const title = String(b.title || '').trim();
+      const tingkatRaw = String(b.tingkat || 'provinsi').trim().toLowerCase();
+      const tingkat = VALID_PRESTASI_TINGKAT.has(tingkatRaw) ? tingkatRaw : 'provinsi';
+      const kategori = String(b.kategori || 'Akademik').trim();
+      const peraih = String(b.peraih || '').trim();
+      const tahun = String(b.tahun || new Date().getFullYear()).trim();
+      const medaliRaw = String(b.medali || 'juara1').trim().toLowerCase();
+      const medali = VALID_PRESTASI_MEDALI.has(medaliRaw) ? medaliRaw : 'juara1';
+      const penyelenggara = String(b.penyelenggara || '').trim();
+
+      if (!title || !peraih || !penyelenggara) {
+        return res.status(400).json({ error: 'Judul prestasi, peraih, dan penyelenggara wajib diisi.' });
+      }
+
+      const id = `prestasi-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const slug = `${slugifyServer(title)}-${Math.floor(100 + Math.random() * 900)}`;
+
+      db.prepare(`
+        INSERT INTO prestasi (id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara, Date.now());
+
+      const created = db
+        .prepare('SELECT id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara FROM prestasi WHERE id = ?')
+        .get(id);
+      return res.status(201).json({ record: created });
+    } catch (error) {
+      console.error('POST /api/prestasi failed:', error);
+      return res.status(500).json({ error: 'Gagal menyimpan data prestasi.' });
+    }
+  });
+
+  app.put('/api/prestasi/:id', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi5'])) return;
+    try {
+      const id = String(req.params.id || '').trim();
+      const b = req.body ?? {};
+      const title = String(b.title || '').trim();
+      const tingkatRaw = String(b.tingkat || 'provinsi').trim().toLowerCase();
+      const tingkat = VALID_PRESTASI_TINGKAT.has(tingkatRaw) ? tingkatRaw : 'provinsi';
+      const kategori = String(b.kategori || 'Akademik').trim();
+      const peraih = String(b.peraih || '').trim();
+      const tahun = String(b.tahun || '').trim();
+      const medaliRaw = String(b.medali || 'juara1').trim().toLowerCase();
+      const medali = VALID_PRESTASI_MEDALI.has(medaliRaw) ? medaliRaw : 'juara1';
+      const penyelenggara = String(b.penyelenggara || '').trim();
+
+      if (!title || !peraih || !penyelenggara) {
+        return res.status(400).json({ error: 'Judul prestasi, peraih, dan penyelenggara wajib diisi.' });
+      }
+
+      db.prepare(`
+        UPDATE prestasi
+        SET title = ?, tingkat = ?, kategori = ?, peraih = ?, tahun = ?, medali = ?, penyelenggara = ?
+        WHERE id = ?
+      `).run(title, tingkat, kategori, peraih, tahun, medali, penyelenggara, id);
+
+      const updated = db
+        .prepare('SELECT id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara FROM prestasi WHERE id = ?')
+        .get(id);
+      return res.json({ record: updated });
+    } catch (error) {
+      console.error('PUT /api/prestasi/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal memperbarui data prestasi.' });
+    }
+  });
+
+  app.delete('/api/prestasi/:id', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi5'])) return;
+    try {
+      db.prepare('DELETE FROM prestasi WHERE id = ?').run(String(req.params.id || '').trim());
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error('DELETE /api/prestasi/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal menghapus data prestasi.' });
     }
   });
 

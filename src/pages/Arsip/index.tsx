@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FileText, Download, Search, CheckCircle2, ShieldCheck, Clock, ExternalLink } from 'lucide-react';
 import { motion } from 'motion/react';
 import { PageHeader } from '../../components/shared/PageHeader';
-import { Badge, EmptyState } from '../../components/ui';
-import { arsipData } from '../../data';
+import { Badge, EmptyState, LoadingState } from '../../components/ui';
 import type { ArsipItem } from '../../types';
 import { ScrollReveal, TiltSpotlightCard } from '../../components/motion/MotionPrimitives';
 import { useMotionSystem } from '../../components/motion/MotionProvider';
+import { fetchArsip, subscribeToTableChanges } from '../../services/dataClient';
 
 const JENIS_TABS = [
   { value: 'all', label: 'Semua Arsip' },
@@ -15,8 +15,6 @@ const JENIS_TABS = [
   { value: 'dokumen', label: 'Dokumen & Pedoman' },
   { value: 'laporan', label: 'Laporan Kegiatan' },
 ];
-
-const IDENTITY_BOOK_URL = 'https://drive.google.com/file/d/13sMxyTngsF2MtmEjuDojQEMSIJ5MrzhB/view?usp=drive_link';
 
 function getBadgeColor(jenis: ArsipItem['jenis']) {
   switch (jenis) {
@@ -35,11 +33,33 @@ function getBadgeColor(jenis: ArsipItem['jenis']) {
 
 export default function Arsip() {
   const { reducedMotion } = useMotionSystem();
+  const [arsipList, setArsipList] = useState<ArsipItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [downloadedId, setDownloadedId] = useState<string | null>(null);
 
-  const filtered = arsipData.filter((item) => {
+  useEffect(() => {
+    let active = true;
+    fetchArsip()
+      .then((items) => {
+        if (active) setArsipList(items);
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    const unsubscribe = subscribeToTableChanges('arsip', () => {
+      fetchArsip().then((items) => {
+        if (active) setArsipList(items);
+      });
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const filtered = arsipList.filter((item) => {
     const matchType = activeTab === 'all' || item.jenis === activeTab;
     const matchSearch =
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -195,17 +215,23 @@ export default function Arsip() {
           </div>
 
           {/* Archive Document List */}
-          {filtered.length === 0 ? (
+          {isLoading ? (
+            <LoadingState />
+          ) : filtered.length === 0 ? (
             <EmptyState
-              title="Tidak ada arsip yang cocok"
-              description="Silakan periksa kembali kata kunci pencarian atau ganti kategori dokumen."
+              title={arsipList.length === 0 ? 'Belum ada dokumen arsip' : 'Tidak ada arsip yang cocok'}
+              description={
+                arsipList.length === 0
+                  ? 'Dokumen resmi yang diunggah Pengurus Inti OPDIM akan tampil di repositori terbuka ini.'
+                  : 'Silakan periksa kembali kata kunci pencarian atau ganti kategori dokumen.'
+              }
             />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {filtered.map((item, idx) => {
                 const badgeInfo = getBadgeColor(item.jenis);
                 const isDownloaded = downloadedId === item.id;
-                const isIdentityBook = item.id === 'ar-idbook';
+                const hasExternalLink = Boolean(item.fileUrl);
 
                 return (
                   <ScrollReveal key={item.id} preset="fadeUp" delay={Math.min(idx * 0.05, 0.2)}>
@@ -247,12 +273,12 @@ export default function Arsip() {
                           <div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
                               <Badge variant={badgeInfo.variant}>{badgeInfo.label}</Badge>
-                              <span style={{ fontSize: '0.78rem', color: 'var(--mid-grey)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <span className="tabular-nums" style={{ fontSize: '0.78rem', color: 'var(--mid-grey)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                                 <Clock size={13} />
                                 {item.tanggal}
                               </span>
-                              <span style={{ fontSize: '0.78rem', color: 'var(--mid-grey)' }}>
-                                • {item.ukuran}
+                              <span className="tabular-nums" style={{ fontSize: '0.78rem', color: 'var(--mid-grey)' }}>
+                                · {item.ukuran}
                               </span>
                             </div>
 
@@ -275,17 +301,18 @@ export default function Arsip() {
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          {isIdentityBook ? (
+                          {hasExternalLink ? (
                             <motion.a
                               whileTap={reducedMotion ? undefined : { scale: 0.96 }}
-                              href={IDENTITY_BOOK_URL}
+                              href={item.fileUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={() => handleDownloadFeedback(item.id)}
                               className="btn btn-outline btn-sm"
+                              style={{ minHeight: '44px' }}
                             >
                               <Download size={16} />
-                              <span>Unduh di Drive</span>
+                              <span>{isDownloaded ? 'Membuka Berkas...' : 'Buka & Unduh'}</span>
                               <ExternalLink size={13} />
                             </motion.a>
                           ) : (
@@ -295,6 +322,7 @@ export default function Arsip() {
                               onClick={() => handleDownloadFeedback(item.id)}
                               className="btn btn-outline btn-sm"
                               style={{
+                                minHeight: '44px',
                                 background: isDownloaded ? 'var(--ghost-purple)' : 'transparent',
                                 color: isDownloaded ? '#2E7D32' : 'var(--royal-purple)',
                                 borderColor: isDownloaded ? '#A5D6A7' : 'var(--pale-lilac)',
@@ -303,12 +331,12 @@ export default function Arsip() {
                               {isDownloaded ? (
                                 <>
                                   <CheckCircle2 size={16} style={{ color: '#2E7D32' }} />
-                                  <span>Disiapkan untuk Unduh</span>
+                                  <span>Tercatat di Arsip</span>
                                 </>
                               ) : (
                                 <>
                                   <Download size={16} />
-                                  <span>Unduh Berkas</span>
+                                  <span>Detail Berkas</span>
                                 </>
                               )}
                             </motion.button>

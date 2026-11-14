@@ -12,8 +12,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { PageHeader } from '../../components/shared/PageHeader';
-import { Badge, StatusBadge } from '../../components/ui';
-import { eventData } from '../../data';
+import { Badge, EmptyState, LoadingState, StatusBadge } from '../../components/ui';
 import type { EventItem } from '../../types';
 import { ScrollReveal } from '../../components/motion/MotionPrimitives';
 import { useMotionSystem } from '../../components/motion/MotionProvider';
@@ -27,12 +26,14 @@ import { downloadEventIcs } from '../../utils/icsCalendar';
 import { buildWhatsAppShareUrl } from '../../utils/shareUtils';
 
 function formatDate(d: string) {
+  const parsed = new Date(d);
+  if (Number.isNaN(parsed.getTime())) return d;
   return new Intl.DateTimeFormat('id-ID', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  }).format(new Date(d));
+  }).format(parsed);
 }
 
 export default function EventPage() {
@@ -41,7 +42,8 @@ export default function EventPage() {
   const highlightedSlug = searchParams.get('highlight');
 
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
-  const [events, setEvents] = useState<EventItem[]>(eventData);
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [savedIds, setSavedIds] = useState<string[]>([]);
   const [downloadedId, setDownloadedId] = useState<string | null>(null);
 
@@ -50,9 +52,13 @@ export default function EventPage() {
     fetchSavedEventIds().then((ids) => {
       if (active) setSavedIds(ids);
     });
-    fetchEvents().then((items) => {
-      if (active) setEvents(items);
-    });
+    fetchEvents()
+      .then((items) => {
+        if (active) setEvents(items);
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
     const unsubscribe = subscribeToTableChanges('events', () => {
       fetchEvents().then((items) => {
         if (active) setEvents(items);
@@ -88,7 +94,6 @@ export default function EventPage() {
 
   const handleToggleSave = async (id: string) => {
     const currentlySaved = savedIds.includes(id);
-    // Optimistic update followed by persisted backend state
     setSavedIds((prev) =>
       currentlySaved ? prev.filter((item) => item !== id) : [...prev, id]
     );
@@ -96,7 +101,7 @@ export default function EventPage() {
     setSavedIds(updatedIds);
   };
 
-  const handleDownloadIcs = (event: (typeof eventData)[number]) => {
+  const handleDownloadIcs = (event: EventItem) => {
     const ok = downloadEventIcs(event);
     if (ok) {
       setDownloadedId(event.id);
@@ -175,8 +180,16 @@ export default function EventPage() {
           </div>
 
           {/* Events list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {filtered.map((event, idx) => {
+          {isLoading ? (
+            <LoadingState />
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              title="Belum ada agenda event"
+              description="Agenda kegiatan resmi yang dijadwalkan Pengurus Inti OPDIM akan tampil di halaman ini."
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {filtered.map((event, idx) => {
               const isHighlighted = highlightedSlug === event.slug;
               const isSaved = savedIds.includes(event.id);
               const isDownloaded = downloadedId === event.id;
@@ -395,6 +408,7 @@ export default function EventPage() {
               );
             })}
           </div>
+          )}
         </div>
       </section>
 

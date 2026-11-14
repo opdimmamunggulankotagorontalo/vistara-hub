@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Award, Search, Filter, ArrowRight } from 'lucide-react';
 import { motion } from 'motion/react';
 import { PageHeader } from '../../components/shared/PageHeader';
-import { Badge, EmptyState } from '../../components/ui';
-import { prestasiData } from '../../data';
+import { Badge, EmptyState, LoadingState } from '../../components/ui';
 import type { PrestasiItem } from '../../types';
+import { fetchPrestasi, subscribeToTableChanges } from '../../services/dataClient';
 import { AnimatedCounter, ScrollReveal, TiltSpotlightCard } from '../../components/motion/MotionPrimitives';
 
 const TINGKAT_OPTIONS = [
@@ -52,22 +52,47 @@ function getMedalConfig(medali: PrestasiItem['medali']) {
 }
 
 export default function Prestasi() {
+  const [items, setItems] = useState<PrestasiItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedTingkat, setSelectedTingkat] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filtered = prestasiData.filter((item) => {
-    const matchTingkat = selectedTingkat === 'all' || item.tingkat === selectedTingkat;
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      void fetchPrestasi()
+        .then((records) => {
+          if (active) setItems(records);
+        })
+        .finally(() => {
+          if (active) setIsLoading(false);
+        });
+    };
+    load();
+    const unsub = subscribeToTableChanges('prestasi', load);
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, []);
+
+  const filtered = items.filter((item) => {
+    const normalizedTingkat = item.tingkat === ('kota' as PrestasiItem['tingkat']) ? 'kabupaten' : item.tingkat;
+    const matchTingkat = selectedTingkat === 'all' || normalizedTingkat === selectedTingkat;
+    const q = searchQuery.toLowerCase();
     const matchSearch =
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.peraih.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.kategori.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.penyelenggara.toLowerCase().includes(searchQuery.toLowerCase());
+      item.title.toLowerCase().includes(q) ||
+      item.peraih.toLowerCase().includes(q) ||
+      item.kategori.toLowerCase().includes(q) ||
+      item.penyelenggara.toLowerCase().includes(q);
     return matchTingkat && matchSearch;
   });
 
-  const countNasional = prestasiData.filter((p) => p.tingkat === 'nasional').length;
-  const countProvinsi = prestasiData.filter((p) => p.tingkat === 'provinsi').length;
-  const countKota = prestasiData.filter((p) => p.tingkat === 'kabupaten').length;
+  const countNasional = items.filter((p) => p.tingkat === 'nasional').length;
+  const countProvinsi = items.filter((p) => p.tingkat === 'provinsi').length;
+  const countKota = items.filter(
+    (p) => p.tingkat === 'kabupaten' || p.tingkat === ('kota' as PrestasiItem['tingkat'])
+  ).length;
 
   return (
     <div>
@@ -93,7 +118,7 @@ export default function Prestasi() {
             }}
           >
             {[
-              { icon: '🏆', value: prestasiData.length, label: 'Total Prestasi Tercatat', color: 'var(--deep-violet)' },
+              { icon: '🏆', value: items.length, label: 'Total Prestasi Tercatat', color: 'var(--deep-violet)' },
               { icon: '🇮🇩', value: countNasional, label: 'Tingkat Nasional', color: 'var(--royal-purple)' },
               { icon: '🏛️', value: countProvinsi, label: 'Tingkat Provinsi', color: 'var(--vistara-purple)' },
               { icon: '📍', value: countKota, label: 'Tingkat Kota / Kabupaten', color: 'var(--gold-accent)' },
@@ -199,7 +224,14 @@ export default function Prestasi() {
           </div>
 
           {/* Prestasi Cards Grid */}
-          {filtered.length === 0 ? (
+          {isLoading ? (
+            <LoadingState />
+          ) : items.length === 0 ? (
+            <EmptyState
+              title="Belum ada data prestasi"
+              description="Data prestasi santri dan pelajar MAM Unggulan telah dibersihkan dan akan tampil di sini setelah diterbitkan melalui Dashboard Admin."
+            />
+          ) : filtered.length === 0 ? (
             <EmptyState
               title="Tidak ada prestasi yang sesuai kriteria"
               description="Coba ubah kata kunci pencarian atau pilih kategori tingkat yang lain."

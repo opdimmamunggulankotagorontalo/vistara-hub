@@ -1,25 +1,54 @@
-import {
-  initialAspirasiData,
-  initialPollingData,
-  eventData,
-  galeriData,
-  beritaData,
-} from '../data';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type {
+  AdminAccount,
+  AdminRole,
+  AdminSession,
+  ArsipItem,
   AspirasiRecord,
   BeritaItem,
   EventItem,
   GaleriItem,
   PollingTopic,
+  PrestasiItem,
 } from '../types';
+import {
+  ADMIN_ROLES_META,
+  formatBytesReadable,
+  normalizeUsername,
+  slugifyText,
+} from '../utils/adminAuth';
+import { blobToDataUrl, convertImageToWebp1080p } from '../utils/imageOptimizer';
 
-const ASPIRASI_CACHE_KEY = 'vistara_aspirasi_records_v1';
-const POLLING_CACHE_KEY = 'vistara_polling_topics_v1';
-const POLLING_VOTED_KEY = 'vistara_polling_voted_v1';
-const REMINDER_CACHE_KEY = 'vistara_saved_events_v1';
+const ASPIRASI_CACHE_KEY = 'vistara_aspirasi_records_v3';
+const POLLING_CACHE_KEY = 'vistara_polling_topics_v3';
+const EVENTS_CACHE_KEY = 'vistara_events_v2';
+const GALLERY_CACHE_KEY = 'vistara_gallery_v2';
+const BERITA_CACHE_KEY = 'vistara_berita_v2';
+const ARSIP_CACHE_KEY = 'vistara_arsip_v2';
+const PRESTASI_CACHE_KEY = 'vistara_prestasi_v1';
+
+const POLLING_VOTED_KEY = 'vistara_polling_voted_v2';
+const REMINDER_CACHE_KEY = 'vistara_saved_events_v2';
 const CLIENT_ID_KEY = 'vistara_client_id_v1';
+const ADMIN_SESSION_KEY = 'vistara_admin_session_v2';
+const ADMIN_AUTH_PROVIDER_KEY = 'vistara_admin_auth_provider_v2';
 const SYNC_CHANNEL_NAME = 'vistara_realtime_sync_v1';
+
+const LEGACY_DUMMY_ASPIRASI_IDS = new Set(['asp-1', 'asp-2', 'asp-3', 'asp-4']);
+const LEGACY_DUMMY_POLL_IDS = new Set(['poll-1', 'poll-2']);
+
+// Purge legacy dummy-seeded caches and old PIN sessions if present
+if (typeof window !== 'undefined') {
+  try {
+    window.localStorage.removeItem('vistara_aspirasi_records_v1');
+    window.localStorage.removeItem('vistara_aspirasi_records_v2');
+    window.localStorage.removeItem('vistara_polling_topics_v1');
+    window.localStorage.removeItem('vistara_polling_topics_v2');
+    window.sessionStorage.removeItem('vistara_admin_session_v1');
+  } catch {
+    // ignore storage access issues
+  }
+}
 
 export type SyncableTable =
   | 'aspirasi'
@@ -27,7 +56,9 @@ export type SyncableTable =
   | 'polling_options'
   | 'events'
   | 'gallery'
-  | 'berita';
+  | 'berita'
+  | 'arsip'
+  | 'prestasi';
 
 export interface CreateAspirasiInput {
   jenis: AspirasiRecord['jenis'];
@@ -37,6 +68,80 @@ export interface CreateAspirasiInput {
   isAnonim: boolean;
   namaPengirim?: string;
   kelasPengirim?: string;
+}
+
+export interface CreateAdminAccountInput {
+  username: string;
+  fullName: string;
+  jabatan: string;
+  role: AdminRole;
+  password: string;
+  mustChangePassword?: boolean;
+}
+
+export interface UpdateAdminAccountInput {
+  fullName?: string;
+  jabatan?: string;
+  role?: AdminRole;
+  isActive?: boolean;
+  newPassword?: string;
+  mustChangePassword?: boolean;
+}
+
+export interface UploadedMediaResult {
+  url: string;
+  sizeText: string;
+  isWebpOptimized: boolean;
+  width?: number;
+  height?: number;
+  originalSizeText?: string;
+}
+
+function readCacheArray<T>(key: string): T[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed as T[];
+    }
+  } catch {
+    // ignore cache error
+  }
+  return [];
+}
+
+function writeCacheArray<T>(key: string, items: T[]): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(items));
+  } catch {
+    // ignore cache error
+  }
+}
+
+const FALLBACK_TABLES_KEY = 'vistara_local_fallback_tables_v1';
+
+function isLocalFallbackTable(table: SyncableTable): boolean {
+  try {
+    const raw = localStorage.getItem(FALLBACK_TABLES_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.includes(table);
+  } catch {
+    return false;
+  }
+}
+
+function markLocalFallbackTable(table: SyncableTable, active: boolean): void {
+  try {
+    const raw = localStorage.getItem(FALLBACK_TABLES_KEY);
+    const parsed: string[] = raw ? JSON.parse(raw) : [];
+    const set = new Set(Array.isArray(parsed) ? parsed : []);
+    if (active) set.add(table);
+    else set.delete(table);
+    localStorage.setItem(FALLBACK_TABLES_KEY, JSON.stringify(Array.from(set)));
+  } catch {
+    // ignore storage errors
+  }
 }
 
 function broadcastLocalSync(table: SyncableTable): void {
@@ -112,48 +217,6 @@ export function getReminderClientKey(): string {
   }
 }
 
-function readAspirasiCache(): AspirasiRecord[] {
-  try {
-    const raw = localStorage.getItem(ASPIRASI_CACHE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch {
-    // ignore storage read error
-  }
-  return initialAspirasiData;
-}
-
-function writeAspirasiCache(records: AspirasiRecord[]): void {
-  try {
-    localStorage.setItem(ASPIRASI_CACHE_KEY, JSON.stringify(records));
-  } catch {
-    // ignore storage write error
-  }
-}
-
-function readPollingCache(): PollingTopic[] {
-  try {
-    const raw = localStorage.getItem(POLLING_CACHE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch {
-    // ignore
-  }
-  return initialPollingData;
-}
-
-function writePollingCache(polls: PollingTopic[]): void {
-  try {
-    localStorage.setItem(POLLING_CACHE_KEY, JSON.stringify(polls));
-  } catch {
-    // ignore
-  }
-}
-
 export function getVotedPollMap(): Record<string, string> {
   try {
     const raw = localStorage.getItem(POLLING_VOTED_KEY);
@@ -177,26 +240,523 @@ function saveVotedPollChoice(pollId: string, optionId: string): void {
   }
 }
 
-function readReminderCache(): string[] {
+// ─── Admin Account Session & RBAC Authentication ──────────────
+
+type AuthProvider = 'supabase' | 'express';
+
+function getStoredAuthProvider(): AuthProvider {
   try {
-    const raw = localStorage.getItem(REMINDER_CACHE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
+    const val = sessionStorage.getItem(ADMIN_AUTH_PROVIDER_KEY);
+    return val === 'supabase' ? 'supabase' : 'express';
   } catch {
-    // ignore
+    return 'express';
   }
-  return [];
 }
 
-function writeReminderCache(ids: string[]): void {
+function saveAuthProvider(provider: AuthProvider): void {
   try {
-    localStorage.setItem(REMINDER_CACHE_KEY, JSON.stringify(ids));
+    sessionStorage.setItem(ADMIN_AUTH_PROVIDER_KEY, provider);
   } catch {
     // ignore
   }
 }
+
+export function getStoredAdminSession(): AdminSession | null {
+  try {
+    const raw = sessionStorage.getItem(ADMIN_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AdminSession;
+    if (!parsed?.role || !parsed?.token || !parsed?.accountId || !parsed?.username) return null;
+    if (Date.now() - parsed.loggedInAt > 1000 * 60 * 60 * 12) {
+      sessionStorage.removeItem(ADMIN_SESSION_KEY);
+      sessionStorage.removeItem(ADMIN_AUTH_PROVIDER_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function saveAdminSession(session: AdminSession): void {
+  try {
+    sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
+  } catch {
+    // ignore
+  }
+}
+
+export function clearAdminSession(): void {
+  try {
+    sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    sessionStorage.removeItem(ADMIN_AUTH_PROVIDER_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function adminHeaders(token?: string): HeadersInit {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const resolvedToken = token || getStoredAdminSession()?.token;
+  if (resolvedToken) {
+    headers['X-Admin-Token'] = resolvedToken;
+  }
+  return headers;
+}
+
+function isSupabaseRpcUnavailable(err: { code?: string; message?: string } | null | undefined): boolean {
+  if (!err) return false;
+  const msg = String(err.message || '').toLowerCase();
+  const code = String(err.code || '').toUpperCase();
+  return (
+    code === 'PGRST202' ||
+    code === '42883' ||
+    msg.includes('could not find the function') ||
+    msg.includes('does not exist') ||
+    msg.includes('404') ||
+    msg.includes('failed to fetch')
+  );
+}
+
+function mapSupabaseAccountRow(row: Record<string, unknown>): AdminAccount {
+  return {
+    id: String(row.id),
+    username: String(row.username),
+    fullName: String(row.full_name ?? row.fullName ?? ''),
+    jabatan: String(row.jabatan ?? ''),
+    role: String(row.role) as AdminRole,
+    isActive: Boolean(row.is_active ?? row.isActive ?? true),
+    mustChangePassword: Boolean(row.must_change_password ?? row.mustChangePassword ?? false),
+    createdAt: (row.created_at ?? row.createdAt ?? '') as number | string,
+    updatedAt: (row.updated_at ?? row.updatedAt ?? '') as number | string,
+    lastLoginAt: (row.last_login_at ?? row.lastLoginAt ?? null) as number | string | null,
+  };
+}
+
+export async function loginAdminAccount(username: string, password: string): Promise<AdminSession> {
+  const cleanUser = normalizeUsername(username);
+  if (!cleanUser || !password) {
+    throw new Error('Username dan password wajib diisi.');
+  }
+
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase.rpc('admin_login', {
+        p_username: cleanUser,
+        p_password: password,
+      });
+      if (!error && Array.isArray(data) && data[0]) {
+        const row = data[0] as {
+          account_id: string;
+          username: string;
+          full_name: string;
+          jabatan: string;
+          role: AdminRole;
+          token: string;
+          must_change_password: boolean;
+        };
+        const session: AdminSession = {
+          accountId: row.account_id,
+          username: row.username,
+          fullName: row.full_name,
+          jabatan: row.jabatan,
+          role: row.role,
+          roleLabel: ADMIN_ROLES_META[row.role]?.label || 'Pengurus OPDIM',
+          token: row.token,
+          mustChangePassword: Boolean(row.must_change_password),
+          loggedInAt: Date.now(),
+        };
+        saveAuthProvider('supabase');
+        saveAdminSession(session);
+        return session;
+      }
+      if (error && !isSupabaseRpcUnavailable(error)) {
+        throw new Error(error.message || 'Username atau password tidak sesuai.');
+      }
+    } catch (err) {
+      if (err instanceof Error && !err.message.toLowerCase().includes('fetch') && !isSupabaseRpcUnavailable({ message: err.message })) {
+        throw err;
+      }
+    }
+  }
+
+  const res = await fetch('/api/admin/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: cleanUser, password }),
+  });
+  const body = (await res.json().catch(() => null)) as { session?: AdminSession; error?: string } | null;
+  if (!res.ok || !body?.session) {
+    throw new Error(body?.error || 'Username atau password tidak sesuai.');
+  }
+  saveAuthProvider('express');
+  saveAdminSession(body.session);
+  return body.session;
+}
+
+export async function verifyAdminSession(): Promise<AdminSession | null> {
+  const stored = getStoredAdminSession();
+  if (!stored) return null;
+  const provider = getStoredAuthProvider();
+
+  if (provider === 'supabase' && supabase && isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase.rpc('admin_validate_session', {
+        p_token: stored.token,
+      });
+      if (!error && Array.isArray(data)) {
+        if (!data[0]) {
+          clearAdminSession();
+          return null;
+        }
+        const row = data[0] as {
+          account_id: string;
+          username: string;
+          full_name: string;
+          jabatan: string;
+          role: AdminRole;
+          must_change_password: boolean;
+        };
+        const refreshed: AdminSession = {
+          ...stored,
+          accountId: row.account_id,
+          username: row.username,
+          fullName: row.full_name,
+          jabatan: row.jabatan,
+          role: row.role,
+          roleLabel: ADMIN_ROLES_META[row.role]?.label || stored.roleLabel,
+          mustChangePassword: Boolean(row.must_change_password),
+        };
+        saveAdminSession(refreshed);
+        return refreshed;
+      }
+    } catch {
+      return stored;
+    }
+  }
+
+  try {
+    const res = await fetch('/api/admin/auth/session', {
+      headers: adminHeaders(stored.token),
+    });
+    if (res.status === 401 || res.status === 403) {
+      clearAdminSession();
+      return null;
+    }
+    if (res.ok) {
+      const data = (await res.json()) as { session?: AdminSession };
+      if (data.session) {
+        saveAdminSession(data.session);
+        return data.session;
+      }
+    }
+  } catch {
+    // keep session if offline transiently
+  }
+
+  return stored;
+}
+
+export async function logoutAdminSession(): Promise<void> {
+  const stored = getStoredAdminSession();
+  const provider = getStoredAuthProvider();
+  if (stored?.token) {
+    if (provider === 'supabase' && supabase && isSupabaseConfigured) {
+      try {
+        await supabase.rpc('admin_logout', { p_token: stored.token });
+      } catch {
+        // ignore
+      }
+    } else {
+      try {
+        await fetch('/api/admin/auth/logout', {
+          method: 'POST',
+          headers: adminHeaders(stored.token),
+        });
+      } catch {
+        // ignore
+      }
+    }
+  }
+  clearAdminSession();
+}
+
+export async function changeOwnAdminPassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<AdminSession> {
+  const stored = getStoredAdminSession();
+  if (!stored) {
+    throw new Error('Sesi admin tidak ditemukan. Silakan masuk kembali.');
+  }
+
+  const provider = getStoredAuthProvider();
+  if (provider === 'supabase' && supabase && isSupabaseConfigured) {
+    const { data, error } = await supabase.rpc('admin_change_own_password', {
+      p_token: stored.token,
+      p_current_password: currentPassword,
+      p_new_password: newPassword,
+    });
+    if (error) {
+      throw new Error(error.message || 'Gagal memperbarui password akun.');
+    }
+    const row = Array.isArray(data) ? (data[0] as { token?: string } | undefined) : undefined;
+    if (!row?.token) {
+      throw new Error('Gagal memperbarui token sesi setelah ganti password.');
+    }
+    const updated: AdminSession = {
+      ...stored,
+      token: row.token,
+      mustChangePassword: false,
+      loggedInAt: Date.now(),
+    };
+    saveAdminSession(updated);
+    return updated;
+  }
+
+  const res = await fetch('/api/admin/auth/change-password', {
+    method: 'POST',
+    headers: adminHeaders(stored.token),
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  const body = (await res.json().catch(() => null)) as { session?: AdminSession; error?: string } | null;
+  if (!res.ok || !body?.session) {
+    throw new Error(body?.error || 'Gagal memperbarui password akun.');
+  }
+  saveAdminSession(body.session);
+  return body.session;
+}
+
+export async function fetchAdminAccounts(): Promise<AdminAccount[]> {
+  const stored = getStoredAdminSession();
+  if (!stored) throw new Error('Sesi admin tidak valid.');
+  const provider = getStoredAuthProvider();
+
+  if (provider === 'supabase' && supabase && isSupabaseConfigured) {
+    const { data, error } = await supabase.rpc('admin_list_accounts', {
+      p_token: stored.token,
+    });
+    if (error) {
+      throw new Error(error.message || 'Gagal memuat daftar akun admin.');
+    }
+    return ((data as Array<Record<string, unknown>>) || []).map(mapSupabaseAccountRow);
+  }
+
+  const res = await fetch('/api/admin/accounts', { headers: adminHeaders(stored.token) });
+  const body = (await res.json().catch(() => null)) as { accounts?: AdminAccount[]; error?: string } | null;
+  if (!res.ok || !Array.isArray(body?.accounts)) {
+    throw new Error(body?.error || 'Gagal memuat daftar akun admin.');
+  }
+  return body.accounts;
+}
+
+export async function createAdminAccount(input: CreateAdminAccountInput): Promise<AdminAccount> {
+  const stored = getStoredAdminSession();
+  if (!stored) throw new Error('Sesi admin tidak valid.');
+  const provider = getStoredAuthProvider();
+
+  if (provider === 'supabase' && supabase && isSupabaseConfigured) {
+    const { data, error } = await supabase.rpc('admin_create_account', {
+      p_token: stored.token,
+      p_username: normalizeUsername(input.username),
+      p_full_name: input.fullName.trim(),
+      p_jabatan: input.jabatan.trim(),
+      p_role: input.role,
+      p_password: input.password,
+      p_must_change: input.mustChangePassword !== false,
+    });
+    if (error) {
+      throw new Error(error.message || 'Gagal membuat akun pengurus.');
+    }
+    const row = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined;
+    if (!row) throw new Error('Gagal menerima data akun baru.');
+    return mapSupabaseAccountRow(row);
+  }
+
+  const res = await fetch('/api/admin/accounts', {
+    method: 'POST',
+    headers: adminHeaders(stored.token),
+    body: JSON.stringify({
+      ...input,
+      username: normalizeUsername(input.username),
+      fullName: input.fullName.trim(),
+      jabatan: input.jabatan.trim(),
+    }),
+  });
+  const body = (await res.json().catch(() => null)) as { account?: AdminAccount; error?: string } | null;
+  if (!res.ok || !body?.account) {
+    throw new Error(body?.error || 'Gagal membuat akun pengurus.');
+  }
+  return body.account;
+}
+
+export async function updateAdminAccount(
+  accountId: string,
+  input: UpdateAdminAccountInput
+): Promise<AdminAccount> {
+  const stored = getStoredAdminSession();
+  if (!stored) throw new Error('Sesi admin tidak valid.');
+  const provider = getStoredAuthProvider();
+
+  if (provider === 'supabase' && supabase && isSupabaseConfigured) {
+    const { data, error } = await supabase.rpc('admin_update_account', {
+      p_token: stored.token,
+      p_account_id: accountId,
+      p_full_name: input.fullName !== undefined ? input.fullName.trim() : null,
+      p_jabatan: input.jabatan !== undefined ? input.jabatan.trim() : null,
+      p_role: input.role ?? null,
+      p_is_active: input.isActive !== undefined ? input.isActive : null,
+      p_new_password: input.newPassword ? input.newPassword : null,
+      p_must_change: input.mustChangePassword !== undefined ? input.mustChangePassword : null,
+    });
+    if (error) {
+      throw new Error(error.message || 'Gagal memperbarui akun pengurus.');
+    }
+    const row = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : undefined;
+    if (!row) throw new Error('Akun pengurus tidak ditemukan.');
+    return mapSupabaseAccountRow(row);
+  }
+
+  const res = await fetch(`/api/admin/accounts/${encodeURIComponent(accountId)}`, {
+    method: 'PATCH',
+    headers: adminHeaders(stored.token),
+    body: JSON.stringify(input),
+  });
+  const body = (await res.json().catch(() => null)) as { account?: AdminAccount; error?: string } | null;
+  if (!res.ok || !body?.account) {
+    throw new Error(body?.error || 'Gagal memperbarui akun pengurus.');
+  }
+  return body.account;
+}
+
+export async function deleteAdminAccount(accountId: string): Promise<void> {
+  const stored = getStoredAdminSession();
+  if (!stored) throw new Error('Sesi admin tidak valid.');
+  const provider = getStoredAuthProvider();
+
+  if (provider === 'supabase' && supabase && isSupabaseConfigured) {
+    const { error } = await supabase.rpc('admin_delete_account', {
+      p_token: stored.token,
+      p_account_id: accountId,
+    });
+    if (error) {
+      throw new Error(error.message || 'Gagal menghapus akun pengurus.');
+    }
+    return;
+  }
+
+  const res = await fetch(`/api/admin/accounts/${encodeURIComponent(accountId)}`, {
+    method: 'DELETE',
+    headers: adminHeaders(stored.token),
+  });
+  const body = (await res.json().catch(() => null)) as { error?: string } | null;
+  if (!res.ok) {
+    throw new Error(body?.error || 'Gagal menghapus akun pengurus.');
+  }
+}
+
+// ─── Media Upload + Auto 1080p WebP Optimization ─────────────
+
+export async function uploadOptimizedMedia(
+  file: File,
+  folder: 'berita' | 'galeri' | 'events' | 'arsip'
+): Promise<UploadedMediaResult> {
+  const isImage = file.type.startsWith('image/');
+  let uploadBlob: Blob = file;
+  let uploadName = file.name;
+  let mimeType = file.type || 'application/octet-stream';
+  let width: number | undefined;
+  let height: number | undefined;
+  let originalSizeText: string | undefined;
+
+  if (isImage) {
+    const optimized = await convertImageToWebp1080p(file, 0.82);
+    uploadBlob = optimized.blob;
+    uploadName = optimized.fileName;
+    mimeType = 'image/webp';
+    width = optimized.width;
+    height = optimized.height;
+    originalSizeText = optimized.originalSizeText;
+  }
+
+  const sizeText = formatBytesReadable(uploadBlob.size);
+
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const cleanName = uploadName.replace(/[^a-zA-Z0-9._-]/g, '-');
+      const objectPath = `${folder}/${Date.now()}-${cleanName}`;
+      const { error } = await supabase.storage
+        .from('vistara-media')
+        .upload(objectPath, uploadBlob, {
+          contentType: mimeType,
+          upsert: false,
+        });
+
+      if (!error) {
+        const { data: pubData } = supabase.storage
+          .from('vistara-media')
+          .getPublicUrl(objectPath);
+        if (pubData?.publicUrl) {
+          return {
+            url: pubData.publicUrl,
+            sizeText,
+            isWebpOptimized: isImage,
+            width,
+            height,
+            originalSizeText,
+          };
+        }
+      }
+    } catch {
+      // fall through to Express /api/upload
+    }
+  }
+
+  const dataUrl = await blobToDataUrl(uploadBlob);
+
+  try {
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: adminHeaders(),
+      body: JSON.stringify({
+        folder,
+        fileName: uploadName,
+        mimeType,
+        base64: dataUrl,
+      }),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { url: string; sizeText?: string };
+      return {
+        url: data.url,
+        sizeText: data.sizeText || sizeText,
+        isWebpOptimized: isImage,
+        width,
+        height,
+        originalSizeText,
+      };
+    }
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    if (errBody?.error && res.status < 500) {
+      throw new Error(errBody.error);
+    }
+  } catch (err) {
+    if (err instanceof Error && !err.message.includes('fetch')) {
+      throw err;
+    }
+  }
+
+  return {
+    url: dataUrl,
+    sizeText,
+    isWebpOptimized: isImage,
+    width,
+    height,
+    originalSizeText,
+  };
+}
+
+// ─── Aspirasi Operations ───────────────────────────────────────
 
 interface SupabaseAspirasiRow {
   id: string;
@@ -234,23 +794,37 @@ function mapSupabaseAspirasiRow(row: SupabaseAspirasiRow): AspirasiRecord {
   };
 }
 
-// ─── Aspirasi Operations ───────────────────────────────────────
+function purgeLegacyDummyAspirasiFromSupabase(rows: SupabaseAspirasiRow[]): void {
+  if (!supabase || !isSupabaseConfigured) return;
+  const legacyIds = rows.filter((r) => LEGACY_DUMMY_ASPIRASI_IDS.has(r.id)).map((r) => r.id);
+  if (legacyIds.length > 0) {
+    void supabase.from('aspirasi').delete().in('id', legacyIds);
+  }
+}
 
 export async function fetchAspirasi(): Promise<AspirasiRecord[]> {
-  if (supabase && isSupabaseConfigured) {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('aspirasi')) {
     try {
       const { data, error } = await supabase
         .from('aspirasi')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
-        const mapped = (data as SupabaseAspirasiRow[]).map(mapSupabaseAspirasiRow);
-        writeAspirasiCache(mapped);
-        return mapped;
+      if (!error && Array.isArray(data)) {
+        const rawRows = data as SupabaseAspirasiRow[];
+        purgeLegacyDummyAspirasiFromSupabase(rawRows);
+        const mapped = rawRows
+          .filter((r) => !LEGACY_DUMMY_ASPIRASI_IDS.has(r.id))
+          .map(mapSupabaseAspirasiRow);
+        if (mapped.length > 0) {
+          writeCacheArray(ASPIRASI_CACHE_KEY, mapped);
+          return mapped;
+        }
+        // If Supabase returned empty or only legacy dummy rows, keep cache clean and still check local fallback if needed
+        writeCacheArray(ASPIRASI_CACHE_KEY, []);
       }
     } catch {
-      // fall through to Express API
+      // fall through
     }
   }
 
@@ -259,22 +833,25 @@ export async function fetchAspirasi(): Promise<AspirasiRecord[]> {
     if (res.ok) {
       const data = (await res.json()) as { records?: AspirasiRecord[] };
       if (Array.isArray(data.records)) {
-        writeAspirasiCache(data.records);
-        return data.records;
+        const cleaned = data.records.filter((r) => !LEGACY_DUMMY_ASPIRASI_IDS.has(r.id));
+        writeCacheArray(ASPIRASI_CACHE_KEY, cleaned);
+        return cleaned;
       }
     }
   } catch {
     // offline fallback
   }
 
-  return readAspirasiCache();
+  return readCacheArray<AspirasiRecord>(ASPIRASI_CACHE_KEY).filter(
+    (r) => !LEGACY_DUMMY_ASPIRASI_IDS.has(r.id)
+  );
 }
 
 export async function trackAspirasi(code: string): Promise<AspirasiRecord | null> {
   const cleanCode = code.trim().toUpperCase();
   if (!cleanCode) return null;
 
-  if (supabase && isSupabaseConfigured) {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('aspirasi')) {
     try {
       const { data, error } = await supabase
         .from('aspirasi')
@@ -284,7 +861,10 @@ export async function trackAspirasi(code: string): Promise<AspirasiRecord | null
         .limit(1);
 
       if (!error && Array.isArray(data) && data[0]) {
-        return mapSupabaseAspirasiRow(data[0] as SupabaseAspirasiRow);
+        const row = data[0] as SupabaseAspirasiRow;
+        if (!LEGACY_DUMMY_ASPIRASI_IDS.has(row.id)) {
+          return mapSupabaseAspirasiRow(row);
+        }
       }
     } catch {
       // fall through
@@ -295,7 +875,9 @@ export async function trackAspirasi(code: string): Promise<AspirasiRecord | null
     const res = await fetch(`/api/aspirasi/${encodeURIComponent(cleanCode)}`);
     if (res.ok) {
       const data = (await res.json()) as { record?: AspirasiRecord };
-      if (data.record) return data.record;
+      if (data.record && !LEGACY_DUMMY_ASPIRASI_IDS.has(data.record.id)) {
+        return data.record;
+      }
     } else if (res.status === 404) {
       return null;
     }
@@ -303,7 +885,9 @@ export async function trackAspirasi(code: string): Promise<AspirasiRecord | null
     // offline fallback
   }
 
-  const cached = readAspirasiCache();
+  const cached = readCacheArray<AspirasiRecord>(ASPIRASI_CACHE_KEY).filter(
+    (r) => !LEGACY_DUMMY_ASPIRASI_IDS.has(r.id)
+  );
   return (
     cached.find(
       (a) => a.kodeLacak.toUpperCase() === cleanCode || a.kodeLacak.toUpperCase().includes(cleanCode)
@@ -352,9 +936,10 @@ export async function submitAspirasi(input: CreateAspirasiInput): Promise<Aspira
         .single();
 
       if (!error && data) {
+        markLocalFallbackTable('aspirasi', false);
         const created = mapSupabaseAspirasiRow(data as SupabaseAspirasiRow);
-        const current = readAspirasiCache();
-        writeAspirasiCache([created, ...current.filter((item) => item.id !== created.id)]);
+        const current = readCacheArray<AspirasiRecord>(ASPIRASI_CACHE_KEY);
+        writeCacheArray(ASPIRASI_CACHE_KEY, [created, ...current.filter((item) => item.id !== created.id)]);
         broadcastLocalSync('aspirasi');
         return created;
       }
@@ -370,16 +955,15 @@ export async function submitAspirasi(input: CreateAspirasiInput): Promise<Aspira
       body: JSON.stringify(input),
     });
     if (res.ok) {
+      markLocalFallbackTable('aspirasi', true);
       const data = (await res.json()) as { record: AspirasiRecord };
-      const current = readAspirasiCache();
-      writeAspirasiCache([data.record, ...current.filter((item) => item.id !== data.record.id)]);
+      const current = readCacheArray<AspirasiRecord>(ASPIRASI_CACHE_KEY);
+      writeCacheArray(ASPIRASI_CACHE_KEY, [data.record, ...current.filter((item) => item.id !== data.record.id)]);
       broadcastLocalSync('aspirasi');
       return data.record;
     }
     const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
-    if (errBody?.error) {
-      throw new Error(errBody.error);
-    }
+    if (errBody?.error) throw new Error(errBody.error);
   } catch (err) {
     if (err instanceof Error && err.message && !err.message.includes('fetch')) {
       throw err;
@@ -409,18 +993,20 @@ export async function submitAspirasi(input: CreateAspirasiInput): Promise<Aspira
     ],
   };
 
-  const current = readAspirasiCache();
-  writeAspirasiCache([fallbackRecord, ...current]);
+  const current = readCacheArray<AspirasiRecord>(ASPIRASI_CACHE_KEY);
+  writeCacheArray(ASPIRASI_CACHE_KEY, [fallbackRecord, ...current]);
   broadcastLocalSync('aspirasi');
   return fallbackRecord;
 }
 
-export async function updateAspirasiStatus(
-  kodeLacak: string,
-  status: AspirasiRecord['status'],
-  keterangan?: string
-): Promise<AspirasiRecord> {
-  const cleanCode = kodeLacak.trim().toUpperCase();
+export async function updateAspirasiAdmin(params: {
+  kodeLacak: string;
+  status: AspirasiRecord['status'];
+  tanggapanResmi?: string;
+  penindaklanjut?: string;
+  keterangan?: string;
+}): Promise<AspirasiRecord> {
+  const cleanCode = params.kodeLacak.trim().toUpperCase();
   const todayStr = new Intl.DateTimeFormat('id-ID', {
     day: 'numeric',
     month: 'short',
@@ -441,23 +1027,30 @@ export async function updateAspirasiStatus(
         const updatedHistory = [
           ...(mapped.riwayatStatus || []),
           {
-            status,
+            status: params.status,
             waktu: todayStr,
-            keterangan: keterangan || `Status diperbarui menjadi ${status} oleh pengurus Komisi 4.`,
+            keterangan:
+              params.keterangan || `Status diperbarui menjadi ${params.status} oleh pengurus Komisi 4.`,
           },
         ];
 
         const { data: updatedRow, error } = await supabase
           .from('aspirasi')
-          .update({ status, riwayat_status: updatedHistory })
+          .update({
+            status: params.status,
+            tanggapan_resmi: params.tanggapanResmi ?? mapped.tanggapanResmi ?? null,
+            penindaklanjut: params.penindaklanjut ?? mapped.penindaklanjut ?? null,
+            riwayat_status: updatedHistory,
+          })
           .eq('id', mapped.id)
           .select('*')
           .single();
 
         if (!error && updatedRow) {
           const result = mapSupabaseAspirasiRow(updatedRow as SupabaseAspirasiRow);
-          const current = readAspirasiCache();
-          writeAspirasiCache(
+          const current = readCacheArray<AspirasiRecord>(ASPIRASI_CACHE_KEY);
+          writeCacheArray(
+            ASPIRASI_CACHE_KEY,
             current.map((item) => (item.kodeLacak.toUpperCase() === cleanCode ? result : item))
           );
           broadcastLocalSync('aspirasi');
@@ -472,54 +1065,98 @@ export async function updateAspirasiStatus(
   try {
     const res = await fetch(`/api/aspirasi/${encodeURIComponent(cleanCode)}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, keterangan }),
+      headers: adminHeaders(),
+      body: JSON.stringify({
+        status: params.status,
+        keterangan: params.keterangan,
+        tanggapanResmi: params.tanggapanResmi,
+        penindaklanjut: params.penindaklanjut,
+      }),
     });
     if (res.ok) {
       const data = (await res.json()) as { record: AspirasiRecord };
-      const current = readAspirasiCache();
-      writeAspirasiCache(
-        current.map((item) =>
-          item.kodeLacak.toUpperCase() === cleanCode ? data.record : item
-        )
+      const current = readCacheArray<AspirasiRecord>(ASPIRASI_CACHE_KEY);
+      writeCacheArray(
+        ASPIRASI_CACHE_KEY,
+        current.map((item) => (item.kodeLacak.toUpperCase() === cleanCode ? data.record : item))
       );
       broadcastLocalSync('aspirasi');
       return data.record;
     }
     const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
-    if (errBody?.error) {
-      throw new Error(errBody.error);
-    }
+    if (errBody?.error) throw new Error(errBody.error);
   } catch (err) {
-    if (err instanceof Error && err.message && !err.message.includes('fetch')) {
-      throw err;
-    }
+    if (err instanceof Error && !err.message.includes('fetch')) throw err;
   }
 
-  const cached = readAspirasiCache();
+  const cached = readCacheArray<AspirasiRecord>(ASPIRASI_CACHE_KEY);
   const existing = cached.find((item) => item.kodeLacak.toUpperCase() === cleanCode);
-  if (!existing) {
-    throw new Error('Aspirasi tidak ditemukan.');
-  }
+  if (!existing) throw new Error('Aspirasi tidak ditemukan.');
 
   const updated: AspirasiRecord = {
     ...existing,
-    status,
+    status: params.status,
+    tanggapanResmi: params.tanggapanResmi ?? existing.tanggapanResmi,
+    penindaklanjut: params.penindaklanjut ?? existing.penindaklanjut,
     riwayatStatus: [
       ...(existing.riwayatStatus || []),
       {
-        status,
+        status: params.status,
         waktu: todayStr,
-        keterangan: keterangan || `Status diperbarui menjadi ${status} oleh pengurus Komisi 4.`,
+        keterangan: params.keterangan || `Status diperbarui menjadi ${params.status}.`,
       },
     ],
   };
-
-  writeAspirasiCache(
+  writeCacheArray(
+    ASPIRASI_CACHE_KEY,
     cached.map((item) => (item.kodeLacak.toUpperCase() === cleanCode ? updated : item))
   );
   broadcastLocalSync('aspirasi');
   return updated;
+}
+
+export async function deleteAspirasi(id: string): Promise<void> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      await supabase.from('aspirasi').delete().eq('id', id);
+    } catch {
+      // ignore
+    }
+  }
+  try {
+    await fetch(`/api/aspirasi/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: adminHeaders(),
+    });
+  } catch {
+    // ignore
+  }
+  const current = readCacheArray<AspirasiRecord>(ASPIRASI_CACHE_KEY);
+  writeCacheArray(
+    ASPIRASI_CACHE_KEY,
+    current.filter((item) => item.id !== id)
+  );
+  broadcastLocalSync('aspirasi');
+}
+
+export async function clearAllAspirasi(): Promise<void> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      await supabase.from('aspirasi').delete().neq('id', '');
+    } catch {
+      // ignore
+    }
+  }
+  try {
+    await fetch('/api/aspirasi', {
+      method: 'DELETE',
+      headers: adminHeaders(),
+    });
+  } catch {
+    // ignore
+  }
+  writeCacheArray(ASPIRASI_CACHE_KEY, []);
+  broadcastLocalSync('aspirasi');
 }
 
 // ─── Polling Operations ────────────────────────────────────────
@@ -542,29 +1179,44 @@ interface SupabasePollingOptionRow {
   sort_order: number;
 }
 
+function purgeLegacyDummyPollsFromSupabase(rows: SupabasePollingTopicRow[]): void {
+  if (!supabase || !isSupabaseConfigured) return;
+  const legacyIds = rows.filter((r) => LEGACY_DUMMY_POLL_IDS.has(r.id)).map((r) => r.id);
+  if (legacyIds.length > 0) {
+    void supabase.from('polling_options').delete().in('poll_id', legacyIds);
+    void supabase.from('polling_topics').delete().in('id', legacyIds);
+  }
+}
+
 export async function fetchPolls(): Promise<PollingTopic[]> {
-  if (supabase && isSupabaseConfigured) {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('polling_topics')) {
     try {
       const [{ data: topics, error: tErr }, { data: options, error: oErr }] = await Promise.all([
         supabase.from('polling_topics').select('*').order('created_at', { ascending: false }),
         supabase.from('polling_options').select('*').order('sort_order', { ascending: true }),
       ]);
 
-      if (!tErr && !oErr && Array.isArray(topics) && topics.length > 0 && Array.isArray(options)) {
-        const hydrated: PollingTopic[] = (topics as SupabasePollingTopicRow[]).map((t) => ({
-          id: t.id,
-          slug: t.slug,
-          question: t.question,
-          description: t.description,
-          category: t.category,
-          status: t.status,
-          closesAt: t.closes_at,
-          options: (options as SupabasePollingOptionRow[])
-            .filter((o) => o.poll_id === t.id)
-            .map((o) => ({ id: o.id, label: o.label, votes: Number(o.votes) })),
-        }));
-        writePollingCache(hydrated);
-        return hydrated;
+      if (!tErr && !oErr && Array.isArray(topics) && Array.isArray(options)) {
+        const rawTopics = topics as SupabasePollingTopicRow[];
+        purgeLegacyDummyPollsFromSupabase(rawTopics);
+        const cleanTopics = rawTopics.filter((t) => !LEGACY_DUMMY_POLL_IDS.has(t.id));
+        if (cleanTopics.length > 0) {
+          const hydrated: PollingTopic[] = cleanTopics.map((t) => ({
+            id: t.id,
+            slug: t.slug,
+            question: t.question,
+            description: t.description,
+            category: t.category,
+            status: t.status,
+            closesAt: t.closes_at,
+            options: (options as SupabasePollingOptionRow[])
+              .filter((o) => o.poll_id === t.id)
+              .map((o) => ({ id: o.id, label: o.label, votes: Number(o.votes) })),
+          }));
+          writeCacheArray(POLLING_CACHE_KEY, hydrated);
+          return hydrated;
+        }
+        writeCacheArray(POLLING_CACHE_KEY, []);
       }
     } catch {
       // fall through
@@ -575,16 +1227,162 @@ export async function fetchPolls(): Promise<PollingTopic[]> {
     const res = await fetch('/api/polling');
     if (res.ok) {
       const data = (await res.json()) as { polls?: PollingTopic[] };
-      if (Array.isArray(data.polls) && data.polls.length > 0) {
-        writePollingCache(data.polls);
-        return data.polls;
+      if (Array.isArray(data.polls)) {
+        const cleaned = data.polls.filter((p) => !LEGACY_DUMMY_POLL_IDS.has(p.id));
+        writeCacheArray(POLLING_CACHE_KEY, cleaned);
+        return cleaned;
       }
     }
   } catch {
     // offline fallback
   }
 
-  return readPollingCache();
+  return readCacheArray<PollingTopic>(POLLING_CACHE_KEY).filter(
+    (p) => !LEGACY_DUMMY_POLL_IDS.has(p.id)
+  );
+}
+
+export async function createPoll(input: {
+  question: string;
+  description: string;
+  category: string;
+  closesAt: string;
+  options: string[];
+}): Promise<PollingTopic[]> {
+  const cleanOptions = input.options.map((o) => o.trim()).filter(Boolean);
+  if (!input.question.trim() || !input.closesAt.trim() || cleanOptions.length < 2) {
+    throw new Error('Pertanyaan, tanggal tutup, dan minimal 2 opsi wajib diisi.');
+  }
+
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const pollId = `poll-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const slug = `${slugifyText(input.question)}-${Math.floor(100 + Math.random() * 900)}`;
+      const { error: tErr } = await supabase.from('polling_topics').insert({
+        id: pollId,
+        slug,
+        question: input.question.trim(),
+        description: input.description.trim() || input.question.trim(),
+        category: input.category.trim() || 'Kegiatan Siswa',
+        status: 'active',
+        closes_at: input.closesAt.trim(),
+      });
+      if (!tErr) {
+        const rows = cleanOptions.map((label, idx) => ({
+          id: `${pollId}-opt-${idx + 1}`,
+          poll_id: pollId,
+          label,
+          votes: 0,
+          sort_order: idx + 1,
+        }));
+        await supabase.from('polling_options').insert(rows);
+        markLocalFallbackTable('polling_topics', false);
+        const latest = await fetchPolls();
+        broadcastLocalSync('polling_topics');
+        return latest;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch('/api/polling', {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify({ ...input, options: cleanOptions }),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal membuat topik polling.');
+  }
+  markLocalFallbackTable('polling_topics', true);
+  const data = (await res.json()) as { polls: PollingTopic[] };
+  writeCacheArray(POLLING_CACHE_KEY, data.polls);
+  broadcastLocalSync('polling_topics');
+  return data.polls;
+}
+
+export async function updatePollStatus(
+  pollId: string,
+  status: 'active' | 'closed'
+): Promise<PollingTopic[]> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const { error } = await supabase
+        .from('polling_topics')
+        .update({ status })
+        .eq('id', pollId);
+      if (!error) {
+        const latest = await fetchPolls();
+        broadcastLocalSync('polling_topics');
+        return latest;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch(`/api/polling/${encodeURIComponent(pollId)}/status`, {
+    method: 'PATCH',
+    headers: adminHeaders(),
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal memperbarui status polling.');
+  }
+  const data = (await res.json()) as { polls: PollingTopic[] };
+  writeCacheArray(POLLING_CACHE_KEY, data.polls);
+  broadcastLocalSync('polling_topics');
+  return data.polls;
+}
+
+export async function deletePoll(pollId: string): Promise<PollingTopic[]> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      await supabase.from('polling_options').delete().eq('poll_id', pollId);
+      await supabase.from('polling_topics').delete().eq('id', pollId);
+      const latest = await fetchPolls();
+      broadcastLocalSync('polling_topics');
+      return latest;
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch(`/api/polling/${encodeURIComponent(pollId)}`, {
+    method: 'DELETE',
+    headers: adminHeaders(),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal menghapus polling.');
+  }
+  const data = (await res.json()) as { polls: PollingTopic[] };
+  writeCacheArray(POLLING_CACHE_KEY, data.polls);
+  broadcastLocalSync('polling_topics');
+  return data.polls;
+}
+
+export async function clearAllPolls(): Promise<void> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      await supabase.from('polling_options').delete().neq('id', '');
+      await supabase.from('polling_topics').delete().neq('id', '');
+    } catch {
+      // ignore
+    }
+  }
+  try {
+    await fetch('/api/polling', {
+      method: 'DELETE',
+      headers: adminHeaders(),
+    });
+  } catch {
+    // ignore
+  }
+  writeCacheArray(POLLING_CACHE_KEY, []);
+  broadcastLocalSync('polling_topics');
 }
 
 export async function voteOnPoll(pollId: string, optionId: string): Promise<PollingTopic[]> {
@@ -615,7 +1413,7 @@ export async function voteOnPoll(pollId: string, optionId: string): Promise<Poll
     if (res.ok) {
       const data = (await res.json()) as { polls?: PollingTopic[] };
       if (Array.isArray(data.polls)) {
-        writePollingCache(data.polls);
+        writeCacheArray(POLLING_CACHE_KEY, data.polls);
         broadcastLocalSync('polling_options');
         return data.polls;
       }
@@ -624,7 +1422,7 @@ export async function voteOnPoll(pollId: string, optionId: string): Promise<Poll
     // offline fallback
   }
 
-  const current = readPollingCache();
+  const current = readCacheArray<PollingTopic>(POLLING_CACHE_KEY);
   const next = current.map((poll) =>
     poll.id !== pollId
       ? poll
@@ -635,15 +1433,15 @@ export async function voteOnPoll(pollId: string, optionId: string): Promise<Poll
           ),
         }
   );
-  writePollingCache(next);
+  writeCacheArray(POLLING_CACHE_KEY, next);
   broadcastLocalSync('polling_options');
   return next;
 }
 
-// ─── Events, Gallery & Berita Supabase Sync ────────────────────
+// ─── Events Operations ─────────────────────────────────────────
 
 export async function fetchEvents(): Promise<EventItem[]> {
-  if (supabase && isSupabaseConfigured) {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('events')) {
     try {
       const { data, error } = await supabase
         .from('events')
@@ -651,17 +1449,162 @@ export async function fetchEvents(): Promise<EventItem[]> {
         .order('date', { ascending: false });
 
       if (!error && Array.isArray(data) && data.length > 0) {
-        return data as EventItem[];
+        const items = data as EventItem[];
+        writeCacheArray(EVENTS_CACHE_KEY, items);
+        return items;
       }
     } catch {
-      // fall back to local data
+      // fall through
     }
   }
-  return eventData;
+
+  try {
+    const res = await fetch('/api/events');
+    if (res.ok) {
+      const data = (await res.json()) as { records?: EventItem[] };
+      if (Array.isArray(data.records)) {
+        writeCacheArray(EVENTS_CACHE_KEY, data.records);
+        return data.records;
+      }
+    }
+  } catch {
+    // offline fallback
+  }
+
+  return readCacheArray<EventItem>(EVENTS_CACHE_KEY);
+}
+
+export async function createEvent(input: Omit<EventItem, 'id' | 'slug'>): Promise<EventItem> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const id = `evt-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const slug = `${slugifyText(input.title)}-${Math.floor(100 + Math.random() * 900)}`;
+      const { data, error } = await supabase
+        .from('events')
+        .insert({
+          id,
+          slug,
+          title: input.title,
+          description: input.description,
+          date: input.date,
+          time: input.time,
+          location: input.location,
+          category: input.category,
+          status: input.status,
+          thumbnail: input.thumbnail ?? null,
+        })
+        .select('*')
+        .single();
+      if (!error && data) {
+        markLocalFallbackTable('events', false);
+        const created = data as EventItem;
+        const curr = readCacheArray<EventItem>(EVENTS_CACHE_KEY);
+        writeCacheArray(EVENTS_CACHE_KEY, [created, ...curr]);
+        broadcastLocalSync('events');
+        return created;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch('/api/events', {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal menyimpan event.');
+  }
+  markLocalFallbackTable('events', true);
+  const data = (await res.json()) as { record: EventItem };
+  const curr = readCacheArray<EventItem>(EVENTS_CACHE_KEY);
+  writeCacheArray(EVENTS_CACHE_KEY, [data.record, ...curr]);
+  broadcastLocalSync('events');
+  return data.record;
+}
+
+export async function updateEvent(id: string, input: Omit<EventItem, 'id' | 'slug'>): Promise<EventItem> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .update({
+          title: input.title,
+          description: input.description,
+          date: input.date,
+          time: input.time,
+          location: input.location,
+          category: input.category,
+          status: input.status,
+          thumbnail: input.thumbnail ?? null,
+        })
+        .eq('id', id)
+        .select('*')
+        .single();
+      if (!error && data) {
+        const updated = data as EventItem;
+        const curr = readCacheArray<EventItem>(EVENTS_CACHE_KEY);
+        writeCacheArray(EVENTS_CACHE_KEY, curr.map((e) => (e.id === id ? updated : e)));
+        broadcastLocalSync('events');
+        return updated;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch(`/api/events/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal memperbarui event.');
+  }
+  const data = (await res.json()) as { record: EventItem };
+  const curr = readCacheArray<EventItem>(EVENTS_CACHE_KEY);
+  writeCacheArray(EVENTS_CACHE_KEY, curr.map((e) => (e.id === id ? data.record : e)));
+  broadcastLocalSync('events');
+  return data.record;
+}
+
+export async function deleteEvent(id: string): Promise<void> {
+  if (supabase && isSupabaseConfigured) {
+    await supabase.from('events').delete().eq('id', id);
+  }
+  try {
+    await fetch(`/api/events/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: adminHeaders(),
+    });
+  } catch {
+    // ignore
+  }
+  const curr = readCacheArray<EventItem>(EVENTS_CACHE_KEY);
+  writeCacheArray(EVENTS_CACHE_KEY, curr.filter((e) => e.id !== id));
+  broadcastLocalSync('events');
+}
+
+// ─── Galeri Operations ─────────────────────────────────────────
+
+function mapSupabaseGaleriRow(row: Record<string, unknown>): GaleriItem {
+  return {
+    id: String(row.id),
+    slug: String(row.slug),
+    title: String(row.title),
+    description: String(row.description),
+    category: String(row.category),
+    date: String(row.date),
+    coverImage: String(row.cover_image ?? row.coverImage ?? ''),
+    imageCount: Number(row.image_count ?? row.imageCount ?? 0),
+  };
 }
 
 export async function fetchGaleri(): Promise<GaleriItem[]> {
-  if (supabase && isSupabaseConfigured) {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('gallery')) {
     try {
       const { data, error } = await supabase
         .from('gallery')
@@ -669,22 +1612,29 @@ export async function fetchGaleri(): Promise<GaleriItem[]> {
         .order('date', { ascending: false });
 
       if (!error && Array.isArray(data) && data.length > 0) {
-        return (data as Array<Record<string, unknown>>).map((row) => ({
-          id: String(row.id),
-          slug: String(row.slug),
-          title: String(row.title),
-          description: String(row.description),
-          category: String(row.category),
-          date: String(row.date),
-          coverImage: String(row.cover_image ?? row.coverImage ?? ''),
-          imageCount: Number(row.image_count ?? row.imageCount ?? 0),
-        }));
+        const mapped = (data as Array<Record<string, unknown>>).map(mapSupabaseGaleriRow);
+        writeCacheArray(GALLERY_CACHE_KEY, mapped);
+        return mapped;
       }
     } catch {
-      // fall back to local data
+      // fall through
     }
   }
-  return galeriData;
+
+  try {
+    const res = await fetch('/api/galeri');
+    if (res.ok) {
+      const data = (await res.json()) as { records?: GaleriItem[] };
+      if (Array.isArray(data.records)) {
+        writeCacheArray(GALLERY_CACHE_KEY, data.records);
+        return data.records;
+      }
+    }
+  } catch {
+    // offline fallback
+  }
+
+  return readCacheArray<GaleriItem>(GALLERY_CACHE_KEY);
 }
 
 export async function fetchGaleriBySlug(slug: string): Promise<GaleriItem | undefined> {
@@ -692,8 +1642,120 @@ export async function fetchGaleriBySlug(slug: string): Promise<GaleriItem | unde
   return list.find((g) => g.slug === slug);
 }
 
-export async function fetchBerita(): Promise<BeritaItem[]> {
+export async function createGaleri(input: Omit<GaleriItem, 'id' | 'slug'>): Promise<GaleriItem> {
   if (supabase && isSupabaseConfigured) {
+    try {
+      const id = `gal-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const slug = `${slugifyText(input.title)}-${Math.floor(100 + Math.random() * 900)}`;
+      const { data, error } = await supabase
+        .from('gallery')
+        .insert({
+          id,
+          slug,
+          title: input.title,
+          description: input.description,
+          category: input.category,
+          date: input.date,
+          cover_image: input.coverImage || '',
+          image_count: input.imageCount || 1,
+        })
+        .select('*')
+        .single();
+      if (!error && data) {
+        markLocalFallbackTable('gallery', false);
+        const created = mapSupabaseGaleriRow(data as Record<string, unknown>);
+        const curr = readCacheArray<GaleriItem>(GALLERY_CACHE_KEY);
+        writeCacheArray(GALLERY_CACHE_KEY, [created, ...curr]);
+        broadcastLocalSync('gallery');
+        return created;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch('/api/galeri', {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal menyimpan album galeri.');
+  }
+  markLocalFallbackTable('gallery', true);
+  const data = (await res.json()) as { record: GaleriItem };
+  const curr = readCacheArray<GaleriItem>(GALLERY_CACHE_KEY);
+  writeCacheArray(GALLERY_CACHE_KEY, [data.record, ...curr]);
+  broadcastLocalSync('gallery');
+  return data.record;
+}
+
+export async function updateGaleri(id: string, input: Omit<GaleriItem, 'id' | 'slug'>): Promise<GaleriItem> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('gallery')
+        .update({
+          title: input.title,
+          description: input.description,
+          category: input.category,
+          date: input.date,
+          cover_image: input.coverImage || '',
+          image_count: input.imageCount || 1,
+        })
+        .eq('id', id)
+        .select('*')
+        .single();
+      if (!error && data) {
+        const updated = mapSupabaseGaleriRow(data as Record<string, unknown>);
+        const curr = readCacheArray<GaleriItem>(GALLERY_CACHE_KEY);
+        writeCacheArray(GALLERY_CACHE_KEY, curr.map((g) => (g.id === id ? updated : g)));
+        broadcastLocalSync('gallery');
+        return updated;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch(`/api/galeri/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal memperbarui album galeri.');
+  }
+  const data = (await res.json()) as { record: GaleriItem };
+  const curr = readCacheArray<GaleriItem>(GALLERY_CACHE_KEY);
+  writeCacheArray(GALLERY_CACHE_KEY, curr.map((g) => (g.id === id ? data.record : g)));
+  broadcastLocalSync('gallery');
+  return data.record;
+}
+
+export async function deleteGaleri(id: string): Promise<void> {
+  if (supabase && isSupabaseConfigured) {
+    await supabase.from('gallery').delete().eq('id', id);
+  }
+  try {
+    await fetch(`/api/galeri/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: adminHeaders(),
+    });
+  } catch {
+    // ignore
+  }
+  const curr = readCacheArray<GaleriItem>(GALLERY_CACHE_KEY);
+  writeCacheArray(GALLERY_CACHE_KEY, curr.filter((g) => g.id !== id));
+  broadcastLocalSync('gallery');
+}
+
+// ─── Berita Operations ─────────────────────────────────────────
+
+export async function fetchBerita(): Promise<BeritaItem[]> {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('berita')) {
     try {
       const { data, error } = await supabase
         .from('berita')
@@ -701,18 +1763,463 @@ export async function fetchBerita(): Promise<BeritaItem[]> {
         .order('date', { ascending: false });
 
       if (!error && Array.isArray(data) && data.length > 0) {
-        return data as BeritaItem[];
+        const items = data as BeritaItem[];
+        writeCacheArray(BERITA_CACHE_KEY, items);
+        return items;
       }
     } catch {
-      // fall back to local data
+      // fall through
     }
   }
-  return beritaData;
+
+  try {
+    const res = await fetch('/api/berita');
+    if (res.ok) {
+      const data = (await res.json()) as { records?: BeritaItem[] };
+      if (Array.isArray(data.records)) {
+        writeCacheArray(BERITA_CACHE_KEY, data.records);
+        return data.records;
+      }
+    }
+  } catch {
+    // offline fallback
+  }
+
+  return readCacheArray<BeritaItem>(BERITA_CACHE_KEY);
 }
 
 export async function fetchBeritaBySlug(slug: string): Promise<BeritaItem | undefined> {
   const list = await fetchBerita();
   return list.find((b) => b.slug === slug);
+}
+
+export async function createBerita(input: Omit<BeritaItem, 'id' | 'slug'>): Promise<BeritaItem> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const id = `berita-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const slug = `${slugifyText(input.title)}-${Math.floor(100 + Math.random() * 900)}`;
+      const { data, error } = await supabase
+        .from('berita')
+        .insert({
+          id,
+          slug,
+          title: input.title,
+          excerpt: input.excerpt,
+          category: input.category,
+          date: input.date,
+          author: input.author,
+          thumbnail: input.thumbnail ?? null,
+          content: input.content ?? null,
+        })
+        .select('*')
+        .single();
+      if (!error && data) {
+        markLocalFallbackTable('berita', false);
+        const created = data as BeritaItem;
+        const curr = readCacheArray<BeritaItem>(BERITA_CACHE_KEY);
+        writeCacheArray(BERITA_CACHE_KEY, [created, ...curr]);
+        broadcastLocalSync('berita');
+        return created;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch('/api/berita', {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal menerbitkan berita.');
+  }
+  markLocalFallbackTable('berita', true);
+  const data = (await res.json()) as { record: BeritaItem };
+  const curr = readCacheArray<BeritaItem>(BERITA_CACHE_KEY);
+  writeCacheArray(BERITA_CACHE_KEY, [data.record, ...curr]);
+  broadcastLocalSync('berita');
+  return data.record;
+}
+
+export async function updateBerita(id: string, input: Omit<BeritaItem, 'id' | 'slug'>): Promise<BeritaItem> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('berita')
+        .update({
+          title: input.title,
+          excerpt: input.excerpt,
+          category: input.category,
+          date: input.date,
+          author: input.author,
+          thumbnail: input.thumbnail ?? null,
+          content: input.content ?? null,
+        })
+        .eq('id', id)
+        .select('*')
+        .single();
+      if (!error && data) {
+        const updated = data as BeritaItem;
+        const curr = readCacheArray<BeritaItem>(BERITA_CACHE_KEY);
+        writeCacheArray(BERITA_CACHE_KEY, curr.map((b) => (b.id === id ? updated : b)));
+        broadcastLocalSync('berita');
+        return updated;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch(`/api/berita/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal memperbarui berita.');
+  }
+  const data = (await res.json()) as { record: BeritaItem };
+  const curr = readCacheArray<BeritaItem>(BERITA_CACHE_KEY);
+  writeCacheArray(BERITA_CACHE_KEY, curr.map((b) => (b.id === id ? data.record : b)));
+  broadcastLocalSync('berita');
+  return data.record;
+}
+
+export async function deleteBerita(id: string): Promise<void> {
+  if (supabase && isSupabaseConfigured) {
+    await supabase.from('berita').delete().eq('id', id);
+  }
+  try {
+    await fetch(`/api/berita/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: adminHeaders(),
+    });
+  } catch {
+    // ignore
+  }
+  const curr = readCacheArray<BeritaItem>(BERITA_CACHE_KEY);
+  writeCacheArray(BERITA_CACHE_KEY, curr.filter((b) => b.id !== id));
+  broadcastLocalSync('berita');
+}
+
+// ─── Arsip Operations ──────────────────────────────────────────
+
+function mapSupabaseArsipRow(row: Record<string, unknown>): ArsipItem {
+  return {
+    id: String(row.id),
+    title: String(row.title),
+    jenis: String(row.jenis) as ArsipItem['jenis'],
+    tanggal: String(row.tanggal),
+    ukuran: String(row.ukuran),
+    deskripsi: String(row.deskripsi),
+    fileUrl: row.file_url ? String(row.file_url) : row.fileUrl ? String(row.fileUrl) : undefined,
+  };
+}
+
+export async function fetchArsip(): Promise<ArsipItem[]> {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('arsip')) {
+    try {
+      const { data, error } = await supabase
+        .from('arsip')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const mapped = (data as Array<Record<string, unknown>>).map(mapSupabaseArsipRow);
+        writeCacheArray(ARSIP_CACHE_KEY, mapped);
+        return mapped;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  try {
+    const res = await fetch('/api/arsip');
+    if (res.ok) {
+      const data = (await res.json()) as { records?: ArsipItem[] };
+      if (Array.isArray(data.records)) {
+        writeCacheArray(ARSIP_CACHE_KEY, data.records);
+        return data.records;
+      }
+    }
+  } catch {
+    // offline fallback
+  }
+
+  return readCacheArray<ArsipItem>(ARSIP_CACHE_KEY);
+}
+
+export async function createArsip(input: Omit<ArsipItem, 'id'>): Promise<ArsipItem> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const id = `arsip-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const { data, error } = await supabase
+        .from('arsip')
+        .insert({
+          id,
+          title: input.title,
+          jenis: input.jenis,
+          tanggal: input.tanggal,
+          ukuran: input.ukuran,
+          deskripsi: input.deskripsi,
+          file_url: input.fileUrl ?? null,
+        })
+        .select('*')
+        .single();
+      if (!error && data) {
+        markLocalFallbackTable('arsip', false);
+        const created = mapSupabaseArsipRow(data as Record<string, unknown>);
+        const curr = readCacheArray<ArsipItem>(ARSIP_CACHE_KEY);
+        writeCacheArray(ARSIP_CACHE_KEY, [created, ...curr]);
+        broadcastLocalSync('arsip');
+        return created;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch('/api/arsip', {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal menerbitkan dokumen arsip.');
+  }
+  markLocalFallbackTable('arsip', true);
+  const data = (await res.json()) as { record: ArsipItem };
+  const curr = readCacheArray<ArsipItem>(ARSIP_CACHE_KEY);
+  writeCacheArray(ARSIP_CACHE_KEY, [data.record, ...curr]);
+  broadcastLocalSync('arsip');
+  return data.record;
+}
+
+export async function updateArsip(id: string, input: Omit<ArsipItem, 'id'>): Promise<ArsipItem> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('arsip')
+        .update({
+          title: input.title,
+          jenis: input.jenis,
+          tanggal: input.tanggal,
+          ukuran: input.ukuran,
+          deskripsi: input.deskripsi,
+          file_url: input.fileUrl ?? null,
+        })
+        .eq('id', id)
+        .select('*')
+        .single();
+      if (!error && data) {
+        const updated = mapSupabaseArsipRow(data as Record<string, unknown>);
+        const curr = readCacheArray<ArsipItem>(ARSIP_CACHE_KEY);
+        writeCacheArray(ARSIP_CACHE_KEY, curr.map((a) => (a.id === id ? updated : a)));
+        broadcastLocalSync('arsip');
+        return updated;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch(`/api/arsip/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal memperbarui dokumen arsip.');
+  }
+  const data = (await res.json()) as { record: ArsipItem };
+  const curr = readCacheArray<ArsipItem>(ARSIP_CACHE_KEY);
+  writeCacheArray(ARSIP_CACHE_KEY, curr.map((a) => (a.id === id ? data.record : a)));
+  broadcastLocalSync('arsip');
+  return data.record;
+}
+
+export async function deleteArsip(id: string): Promise<void> {
+  if (supabase && isSupabaseConfigured) {
+    await supabase.from('arsip').delete().eq('id', id);
+  }
+  try {
+    await fetch(`/api/arsip/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: adminHeaders(),
+    });
+  } catch {
+    // ignore
+  }
+  const curr = readCacheArray<ArsipItem>(ARSIP_CACHE_KEY);
+  writeCacheArray(ARSIP_CACHE_KEY, curr.filter((a) => a.id !== id));
+  broadcastLocalSync('arsip');
+}
+
+// ─── Prestasi Operations ───────────────────────────────────────
+
+export async function fetchPrestasi(): Promise<PrestasiItem[]> {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('prestasi')) {
+    try {
+      const { data, error } = await supabase
+        .from('prestasi')
+        .select('*')
+        .order('tahun', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        const items = data as PrestasiItem[];
+        writeCacheArray(PRESTASI_CACHE_KEY, items);
+        return items;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  try {
+    const res = await fetch('/api/prestasi');
+    if (res.ok) {
+      const data = (await res.json()) as { records?: PrestasiItem[] };
+      if (Array.isArray(data.records)) {
+        writeCacheArray(PRESTASI_CACHE_KEY, data.records);
+        return data.records;
+      }
+    }
+  } catch {
+    // offline fallback
+  }
+
+  return readCacheArray<PrestasiItem>(PRESTASI_CACHE_KEY);
+}
+
+export async function fetchPrestasiBySlug(slug: string): Promise<PrestasiItem | undefined> {
+  const list = await fetchPrestasi();
+  return list.find((p) => p.slug === slug);
+}
+
+export async function createPrestasi(input: Omit<PrestasiItem, 'id' | 'slug'>): Promise<PrestasiItem> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const id = `prestasi-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const slug = `${slugifyText(input.title)}-${Math.floor(100 + Math.random() * 900)}`;
+      const { data, error } = await supabase
+        .from('prestasi')
+        .insert({
+          id,
+          slug,
+          title: input.title,
+          tingkat: input.tingkat,
+          kategori: input.kategori,
+          peraih: input.peraih,
+          tahun: input.tahun,
+          medali: input.medali,
+          penyelenggara: input.penyelenggara,
+        })
+        .select('*')
+        .single();
+      if (!error && data) {
+        markLocalFallbackTable('prestasi', false);
+        const created = data as PrestasiItem;
+        const curr = readCacheArray<PrestasiItem>(PRESTASI_CACHE_KEY);
+        writeCacheArray(PRESTASI_CACHE_KEY, [created, ...curr]);
+        broadcastLocalSync('prestasi');
+        return created;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch('/api/prestasi', {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal menyimpan data prestasi.');
+  }
+  markLocalFallbackTable('prestasi', true);
+  const data = (await res.json()) as { record: PrestasiItem };
+  const curr = readCacheArray<PrestasiItem>(PRESTASI_CACHE_KEY);
+  writeCacheArray(PRESTASI_CACHE_KEY, [data.record, ...curr]);
+  broadcastLocalSync('prestasi');
+  return data.record;
+}
+
+export async function updatePrestasi(
+  id: string,
+  input: Omit<PrestasiItem, 'id' | 'slug'>
+): Promise<PrestasiItem> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('prestasi')
+        .update({
+          title: input.title,
+          tingkat: input.tingkat,
+          kategori: input.kategori,
+          peraih: input.peraih,
+          tahun: input.tahun,
+          medali: input.medali,
+          penyelenggara: input.penyelenggara,
+        })
+        .eq('id', id)
+        .select('*')
+        .single();
+      if (!error && data) {
+        const updated = data as PrestasiItem;
+        const curr = readCacheArray<PrestasiItem>(PRESTASI_CACHE_KEY);
+        writeCacheArray(PRESTASI_CACHE_KEY, curr.map((p) => (p.id === id ? updated : p)));
+        broadcastLocalSync('prestasi');
+        return updated;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch(`/api/prestasi/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal memperbarui data prestasi.');
+  }
+  const data = (await res.json()) as { record: PrestasiItem };
+  const curr = readCacheArray<PrestasiItem>(PRESTASI_CACHE_KEY);
+  writeCacheArray(PRESTASI_CACHE_KEY, curr.map((p) => (p.id === id ? data.record : p)));
+  broadcastLocalSync('prestasi');
+  return data.record;
+}
+
+export async function deletePrestasi(id: string): Promise<void> {
+  if (supabase && isSupabaseConfigured) {
+    try {
+      await supabase.from('prestasi').delete().eq('id', id);
+    } catch {
+      // ignore
+    }
+  }
+  try {
+    await fetch(`/api/prestasi/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: adminHeaders(),
+    });
+  } catch {
+    // ignore
+  }
+  const curr = readCacheArray<PrestasiItem>(PRESTASI_CACHE_KEY);
+  writeCacheArray(PRESTASI_CACHE_KEY, curr.filter((p) => p.id !== id));
+  broadcastLocalSync('prestasi');
 }
 
 // ─── Event Reminders Operations ────────────────────────────────
@@ -729,7 +2236,7 @@ export async function fetchSavedEventIds(): Promise<string[]> {
 
       if (!error && Array.isArray(data)) {
         const ids = (data as Array<{ event_id: string }>).map((r) => r.event_id);
-        writeReminderCache(ids);
+        writeCacheArray(REMINDER_CACHE_KEY, ids);
         return ids;
       }
     } catch {
@@ -742,7 +2249,7 @@ export async function fetchSavedEventIds(): Promise<string[]> {
     if (res.ok) {
       const data = (await res.json()) as { eventIds?: string[] };
       if (Array.isArray(data.eventIds)) {
-        writeReminderCache(data.eventIds);
+        writeCacheArray(REMINDER_CACHE_KEY, data.eventIds);
         return data.eventIds;
       }
     }
@@ -750,7 +2257,7 @@ export async function fetchSavedEventIds(): Promise<string[]> {
     // offline fallback
   }
 
-  return readReminderCache();
+  return readCacheArray<string>(REMINDER_CACHE_KEY);
 }
 
 export async function toggleSavedEventId(
@@ -793,7 +2300,7 @@ export async function toggleSavedEventId(
     if (res.ok) {
       const data = (await res.json()) as { eventIds?: string[] };
       if (Array.isArray(data.eventIds)) {
-        writeReminderCache(data.eventIds);
+        writeCacheArray(REMINDER_CACHE_KEY, data.eventIds);
         return data.eventIds;
       }
     }
@@ -801,10 +2308,10 @@ export async function toggleSavedEventId(
     // offline fallback
   }
 
-  const cached = readReminderCache();
+  const cached = readCacheArray<string>(REMINDER_CACHE_KEY);
   const next = currentlySaved
     ? cached.filter((id) => id !== eventId)
     : Array.from(new Set([...cached, eventId]));
-  writeReminderCache(next);
+  writeCacheArray(REMINDER_CACHE_KEY, next);
   return next;
 }

@@ -13,6 +13,12 @@ import {
   type SearchCategory,
   type SearchResultItem,
 } from '../../utils/globalSearch';
+import {
+  fetchBerita,
+  fetchEvents,
+  subscribeToTableChanges,
+} from '../../services/dataClient';
+import type { BeritaItem, EventItem } from '../../types';
 
 interface GlobalSearchProps {
   mode?: 'desktop' | 'mobile-button' | 'drawer';
@@ -79,14 +85,38 @@ export default function GlobalSearch({ mode = 'desktop', onNavigate }: GlobalSea
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<SearchCategory>('all');
   const [activeIndex, setActiveIndex] = useState(0);
+  const [liveBerita, setLiveBerita] = useState<BeritaItem[]>([]);
+  const [liveEvents, setLiveEvents] = useState<EventItem[]>([]);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const desktopInputRef = useRef<HTMLInputElement | null>(null);
   const modalInputRef = useRef<HTMLInputElement | null>(null);
 
+  useEffect(() => {
+    let active = true;
+    const loadLive = () => {
+      void fetchBerita().then((items) => {
+        if (active) setLiveBerita(items);
+      });
+      void fetchEvents().then((items) => {
+        if (active) setLiveEvents(items);
+      });
+    };
+    loadLive();
+    const unsub = subscribeToTableChanges(['berita', 'events'], loadLive);
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, []);
+
   const searchResponse = useMemo(
-    () => searchGlobalContent(query, category, 6),
-    [query, category]
+    () =>
+      searchGlobalContent(query, category, 6, {
+        berita: liveBerita,
+        events: liveEvents,
+      }),
+    [query, category, liveBerita, liveEvents]
   );
 
   const results = searchResponse.results;

@@ -2,26 +2,32 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, User, Tag } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
-import { Badge } from '../../components/ui';
+import { Badge, LoadingState } from '../../components/ui';
 import ShareButtons from '../../components/ui/ShareButtons';
-import { beritaData } from '../../data';
 import type { BeritaItem } from '../../types';
 import { ScrollReveal, TiltSpotlightCard } from '../../components/motion/MotionPrimitives';
 import { fetchBerita, subscribeToTableChanges } from '../../services/dataClient';
 
 function formatDate(d: string) {
-  return new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(d));
+  const parsed = new Date(d);
+  if (Number.isNaN(parsed.getTime())) return d;
+  return new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(parsed);
 }
 
 export default function BeritaDetailPage() {
   const { slug } = useParams<{ slug: string }>();
-  const [articles, setArticles] = useState<BeritaItem[]>(beritaData);
+  const [articles, setArticles] = useState<BeritaItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    fetchBerita().then((items) => {
-      if (active) setArticles(items);
-    });
+    fetchBerita()
+      .then((items) => {
+        if (active) setArticles(items);
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
     const unsubscribe = subscribeToTableChanges('berita', () => {
       fetchBerita().then((items) => {
         if (active) setArticles(items);
@@ -36,6 +42,14 @@ export default function BeritaDetailPage() {
   const berita = articles.find((b) => b.slug === slug);
   const related = articles.filter((b) => b.slug !== slug).slice(0, 3);
 
+  if (isLoading) {
+    return (
+      <div style={{ padding: '6rem 2rem' }}>
+        <LoadingState />
+      </div>
+    );
+  }
+
   if (!berita) {
     return (
       <div style={{ padding: '8rem 2rem', textAlign: 'center' }}>
@@ -44,6 +58,11 @@ export default function BeritaDetailPage() {
       </div>
     );
   }
+
+  const bodyParagraphs = (berita.content || '')
+    .split(/\n{2,}|\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
 
   return (
     <div>
@@ -74,25 +93,38 @@ export default function BeritaDetailPage() {
               </Link>
 
               <ScrollReveal preset="scaleIn">
-                <div style={{ height: '280px', borderRadius: '16px', background: 'linear-gradient(135deg, var(--deep-violet), var(--vistara-purple))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2rem', overflow: 'hidden' }}>
-                  <img src="/logo-vistara.svg" alt="" style={{ height: '72px', opacity: 0.25, filter: 'brightness(0) invert(1)' }} />
+                <div style={{ height: 'clamp(220px, 38vw, 360px)', borderRadius: '16px', background: 'linear-gradient(135deg, var(--deep-violet), var(--vistara-purple))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2rem', overflow: 'hidden' }}>
+                  {berita.thumbnail ? (
+                    <img
+                      src={berita.thumbnail}
+                      alt={berita.title}
+                      referrerPolicy="no-referrer"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <img src="/logo-vistara.svg" alt="" style={{ height: '72px', opacity: 0.25, filter: 'brightness(0) invert(1)' }} />
+                  )}
                 </div>
               </ScrollReveal>
 
               <ScrollReveal preset="fadeUp" delay={0.05}>
                 <div className="card">
-                  <p style={{ fontSize: '1.05rem', color: 'var(--charcoal)', lineHeight: 1.8, fontWeight: 500, marginBottom: '1.25rem', fontStyle: 'italic', borderLeft: '3px solid var(--soft-lilac)', paddingLeft: '1rem' }}>
+                  <p style={{ fontSize: '1.05rem', color: 'var(--charcoal)', lineHeight: 1.8, fontWeight: 500, marginBottom: bodyParagraphs.length > 0 ? '1.25rem' : 0, fontStyle: 'italic', borderLeft: '3px solid var(--soft-lilac)', paddingLeft: '1rem' }}>
                     {berita.excerpt}
                   </p>
-                  <p style={{ fontSize: '0.95rem', color: 'var(--charcoal)', lineHeight: 1.9, marginBottom: '1rem' }}>
-                    Kegiatan ini merupakan bagian dari komitmen OPDIM VISTARA 2026–2027 dalam memperkuat peran organisasi pelajar sebagai wadah kolaborasi, pembelajaran kepemimpinan, dan pelayanan siswa yang transparan di MAM Unggulan Kota Gorontalo.
-                  </p>
-                  <p style={{ fontSize: '0.95rem', color: 'var(--charcoal)', lineHeight: 1.9, marginBottom: '1rem' }}>
-                    Seluruh rangkaian agenda dilaksanakan melalui koordinasi lintas komisi bersama Majelis Pembina Madrasah agar setiap langkah selaras dengan nilai intelektualitas, akhlak Islami, serta semangat gerakan pelajar Muhammadiyah.
-                  </p>
-                  <p style={{ fontSize: '0.95rem', color: 'var(--charcoal)', lineHeight: 1.9 }}>
-                    Informasi dokumentasi, rekap kegiatan, serta perkembangan tindak lanjut program tersedia di portal VISTARA Hub sebagai bentuk keterbukaan informasi kepada seluruh civitas akademika.
-                  </p>
+                  {bodyParagraphs.map((para, index) => (
+                    <p
+                      key={index}
+                      style={{
+                        fontSize: '0.95rem',
+                        color: 'var(--charcoal)',
+                        lineHeight: 1.9,
+                        marginBottom: index < bodyParagraphs.length - 1 ? '1rem' : 0,
+                      }}
+                    >
+                      {para}
+                    </p>
+                  ))}
                 </div>
               </ScrollReveal>
 
@@ -100,7 +132,6 @@ export default function BeritaDetailPage() {
                 <Tag size={14} style={{ color: 'var(--mid-grey)' }} />
                 <Badge variant="ghost">{berita.category}</Badge>
                 <Badge variant="outline">OPDIM VISTARA</Badge>
-                <Badge variant="outline">2026</Badge>
               </div>
 
               <div

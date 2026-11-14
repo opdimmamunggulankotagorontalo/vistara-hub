@@ -113,11 +113,19 @@ function mapProgramToResult(item: ProgramKerja, score: number): SearchResultItem
   };
 }
 
+export interface SearchDatasets {
+  berita?: BeritaItem[];
+  events?: EventItem[];
+}
+
 export function searchGlobalContent(
   query: string,
   category: SearchCategory = 'all',
-  limit = 18
+  limit = 18,
+  datasets: SearchDatasets = {}
 ): GlobalSearchResponse {
+  const sourceBerita = datasets.berita ?? beritaData;
+  const sourceEvents = datasets.events ?? eventData;
   const trimmed = query.trim();
   const terms = trimmed
     .toLowerCase()
@@ -125,8 +133,8 @@ export function searchGlobalContent(
     .filter(Boolean);
 
   if (terms.length === 0) {
-    const defaultBerita = beritaData.slice(0, 2).map((b, i) => mapBeritaToResult(b, 10 - i));
-    const defaultEvents = eventData
+    const defaultBerita = sourceBerita.slice(0, 2).map((b, i) => mapBeritaToResult(b, 10 - i));
+    const defaultEvents = sourceEvents
       .filter((e) => e.status !== 'past')
       .slice(0, 2)
       .map((e, i) => mapEventToResult(e, 10 - i));
@@ -155,7 +163,7 @@ export function searchGlobalContent(
   }
 
   const matchedBerita: SearchResultItem[] = [];
-  for (const item of beritaData) {
+  for (const item of sourceBerita) {
     const combined = `${item.title} ${item.excerpt} ${item.category} ${item.author} ${item.date}`;
     if (!matchesAllTerms(combined, terms)) continue;
 
@@ -169,7 +177,7 @@ export function searchGlobalContent(
   }
 
   const matchedEvents: SearchResultItem[] = [];
-  for (const item of eventData) {
+  for (const item of sourceEvents) {
     const combined = `${item.title} ${item.description} ${item.category} ${item.location} ${item.date} ${item.status}`;
     if (!matchesAllTerms(combined, terms)) continue;
 

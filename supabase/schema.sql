@@ -1,7 +1,10 @@
 -- ============================================================
--- VISTARA Hub — Supabase PostgreSQL Schema & Realtime Setup
--- Covers: Aspirasi, Polling, Events, Gallery, Berita, Reminders
+-- VISTARA Hub — Supabase PostgreSQL Schema, Auth RPCs & Storage
+-- Covers: Aspirasi, Polling, Events, Gallery, Berita, Arsip,
+--         Prestasi, & Secure Account Auth (Super Admin Root + Pengurus)
 -- ============================================================
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- 1. Aspirasi Siswa
 CREATE TABLE IF NOT EXISTS public.aspirasi (
@@ -91,7 +94,7 @@ CREATE TABLE IF NOT EXISTS public.gallery (
   description TEXT NOT NULL,
   category TEXT NOT NULL,
   date TEXT NOT NULL,
-  cover_image TEXT NOT NULL,
+  cover_image TEXT NOT NULL DEFAULT '',
   image_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -110,8 +113,443 @@ CREATE TABLE IF NOT EXISTS public.berita (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Grant execute permission on polling RPC to client roles
+-- 6. Pusat Arsip & Dokumen Digital
+CREATE TABLE IF NOT EXISTS public.arsip (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  jenis TEXT NOT NULL CHECK (jenis IN ('sk', 'notulen', 'dokumen', 'laporan')),
+  tanggal TEXT NOT NULL,
+  ukuran TEXT NOT NULL,
+  deskripsi TEXT NOT NULL,
+  file_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 7. Hall of Fame Prestasi
+CREATE TABLE IF NOT EXISTS public.prestasi (
+  id TEXT PRIMARY KEY,
+  slug TEXT UNIQUE NOT NULL,
+  title TEXT NOT NULL,
+  tingkat TEXT NOT NULL CHECK (tingkat IN ('nasional', 'provinsi', 'kabupaten', 'kota')),
+  kategori TEXT NOT NULL,
+  peraih TEXT NOT NULL,
+  tahun TEXT NOT NULL,
+  medali TEXT NOT NULL CHECK (medali IN ('emas', 'perak', 'perunggu', 'juara1', 'juara2', 'juara3', 'peserta')),
+  penyelenggara TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 8. Akun Pengurus & Sesi Terenkripsi (Username + Password bcrypt + Revocable Server Sessions)
+DROP FUNCTION IF EXISTS public.verify_admin_pin(TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.get_admin_roles();
+DROP FUNCTION IF EXISTS public.update_admin_pin(TEXT, TEXT, TEXT);
+DROP TABLE IF EXISTS public.admin_roles;
+
+CREATE TABLE IF NOT EXISTS public.admin_accounts (
+  id TEXT PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  full_name TEXT NOT NULL,
+  jabatan TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('root', 'inti', 'komisi4', 'komisi5')),
+  password_hash TEXT NOT NULL,
+  must_change_password BOOLEAN NOT NULL DEFAULT TRUE,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  failed_attempts INTEGER NOT NULL DEFAULT 0,
+  locked_until TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_login_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS public.admin_sessions (
+  token_hash TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL REFERENCES public.admin_accounts(id) ON DELETE CASCADE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Seed ONLY ONE initial Super Admin (Administrator Root) account.
+-- Other accounts (Ketua/Sekretaris Inti, Komisi 4, Komisi 5) are created by Super Admin after login.
+INSERT INTO public.admin_accounts (
+  id, username, full_name, jabatan, role, password_hash, must_change_password, is_active
+) VALUES (
+  'acc-root-001',
+  'superadmin',
+  'Administrator Root OPDIM',
+  'Administrator Root',
+  'root',
+  crypt('VistaraRoot#2026', gen_salt('bf', 10)),
+  TRUE,
+  TRUE
+)
+ON CONFLICT (username) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public._resolve_active_admin_session(p_token TEXT)
+RETURNS TABLE(
+  account_id TEXT,
+  username TEXT,
+  full_name TEXT,
+  jabatan TEXT,
+  role TEXT,
+  must_change_password BOOLEAN,
+  is_active BOOLEAN
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_hash TEXT;
+BEGIN
+  IF p_token IS NULL OR LENGTH(TRIM(p_token)) < 16 THEN
+    RETURN;
+  END IF;
+  v_hash := encode(digest(TRIM(p_token), 'sha256'), 'hex');
+  RETURN QUERY
+  SELECT a.id, a.username, a.full_name, a.jabatan, a.role, a.must_change_password, a.is_active
+  FROM public.admin_sessions s
+  JOIN public.admin_accounts a ON a.id = s.account_id
+  WHERE s.token_hash = v_hash
+    AND s.expires_at > NOW()
+    AND a.is_active = TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_login(p_username TEXT, p_password TEXT)
+RETURNS TABLE(
+  account_id TEXT,
+  username TEXT,
+  full_name TEXT,
+  jabatan TEXT,
+  role TEXT,
+  token TEXT,
+  must_change_password BOOLEAN
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_user TEXT := LOWER(TRIM(COALESCE(p_username, '')));
+  v_acc public.admin_accounts%ROWTYPE;
+  v_raw_token TEXT;
+  v_token_hash TEXT;
+  v_next_attempts INTEGER;
+BEGIN
+  SELECT * INTO v_acc FROM public.admin_accounts WHERE admin_accounts.username = v_user;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Username atau password tidak sesuai.';
+  END IF;
+
+  IF NOT v_acc.is_active THEN
+    RAISE EXCEPTION 'Akun ini telah dinonaktifkan oleh Super Admin.';
+  END IF;
+
+  IF v_acc.locked_until IS NOT NULL AND v_acc.locked_until > NOW() THEN
+    RAISE EXCEPTION 'Terlalu banyak percobaan masuk gagal. Coba lagi beberapa menit lagi.';
+  END IF;
+
+  IF v_acc.password_hash <> crypt(COALESCE(p_password, ''), v_acc.password_hash) THEN
+    v_next_attempts := v_acc.failed_attempts + 1;
+    UPDATE public.admin_accounts
+    SET failed_attempts = CASE WHEN v_next_attempts >= 5 THEN 0 ELSE v_next_attempts END,
+        locked_until = CASE WHEN v_next_attempts >= 5 THEN NOW() + INTERVAL '5 minutes' ELSE NULL END,
+        updated_at = NOW()
+    WHERE id = v_acc.id;
+    IF v_next_attempts >= 5 THEN
+      RAISE EXCEPTION 'Terlalu banyak percobaan gagal. Akun dikunci sementara selama 5 menit.';
+    END IF;
+    RAISE EXCEPTION 'Username atau password tidak sesuai.';
+  END IF;
+
+  v_raw_token := encode(gen_random_bytes(32), 'hex');
+  v_token_hash := encode(digest(v_raw_token, 'sha256'), 'hex');
+
+  DELETE FROM public.admin_sessions WHERE expires_at <= NOW();
+  INSERT INTO public.admin_sessions (token_hash, account_id, expires_at)
+  VALUES (v_token_hash, v_acc.id, NOW() + INTERVAL '12 hours');
+
+  UPDATE public.admin_accounts
+  SET failed_attempts = 0, locked_until = NULL, last_login_at = NOW(), updated_at = NOW()
+  WHERE id = v_acc.id;
+
+  RETURN QUERY SELECT v_acc.id, v_acc.username, v_acc.full_name, v_acc.jabatan, v_acc.role, v_raw_token, v_acc.must_change_password;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_validate_session(p_token TEXT)
+RETURNS TABLE(
+  account_id TEXT,
+  username TEXT,
+  full_name TEXT,
+  jabatan TEXT,
+  role TEXT,
+  must_change_password BOOLEAN
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT s.account_id, s.username, s.full_name, s.jabatan, s.role, s.must_change_password
+  FROM public._resolve_active_admin_session(p_token) s;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_logout(p_token TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_hash TEXT := encode(digest(TRIM(COALESCE(p_token, '')), 'sha256'), 'hex');
+BEGIN
+  DELETE FROM public.admin_sessions WHERE token_hash = v_hash;
+  RETURN TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_change_own_password(
+  p_token TEXT,
+  p_current_password TEXT,
+  p_new_password TEXT
+)
+RETURNS TABLE(token TEXT)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_sess RECORD;
+  v_acc public.admin_accounts%ROWTYPE;
+  v_raw_token TEXT;
+  v_token_hash TEXT;
+BEGIN
+  SELECT * INTO v_sess FROM public._resolve_active_admin_session(p_token) LIMIT 1;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Sesi tidak valid atau telah berakhir.';
+  END IF;
+
+  SELECT * INTO v_acc FROM public.admin_accounts WHERE id = v_sess.account_id;
+  IF v_acc.password_hash <> crypt(COALESCE(p_current_password, ''), v_acc.password_hash) THEN
+    RAISE EXCEPTION 'Password saat ini tidak sesuai.';
+  END IF;
+
+  IF LENGTH(COALESCE(p_new_password, '')) < 8 THEN
+    RAISE EXCEPTION 'Password baru minimal harus terdiri dari 8 karakter.';
+  END IF;
+
+  IF p_new_password = p_current_password THEN
+    RAISE EXCEPTION 'Password baru tidak boleh sama dengan password lama.';
+  END IF;
+
+  DELETE FROM public.admin_sessions WHERE account_id = v_acc.id;
+  v_raw_token := encode(gen_random_bytes(32), 'hex');
+  v_token_hash := encode(digest(v_raw_token, 'sha256'), 'hex');
+  INSERT INTO public.admin_sessions (token_hash, account_id, expires_at)
+  VALUES (v_token_hash, v_acc.id, NOW() + INTERVAL '12 hours');
+
+  UPDATE public.admin_accounts
+  SET password_hash = crypt(p_new_password, gen_salt('bf', 10)),
+      must_change_password = FALSE,
+      updated_at = NOW()
+  WHERE id = v_acc.id;
+
+  RETURN QUERY SELECT v_raw_token;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_list_accounts(p_token TEXT)
+RETURNS TABLE(
+  id TEXT,
+  username TEXT,
+  full_name TEXT,
+  jabatan TEXT,
+  role TEXT,
+  is_active BOOLEAN,
+  must_change_password BOOLEAN,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ,
+  last_login_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_sess RECORD;
+BEGIN
+  SELECT * INTO v_sess FROM public._resolve_active_admin_session(p_token) LIMIT 1;
+  IF NOT FOUND OR v_sess.role <> 'root' OR v_sess.must_change_password THEN
+    RAISE EXCEPTION 'Hanya Super Admin aktif yang diizinkan melihat daftar akun.';
+  END IF;
+
+  RETURN QUERY
+  SELECT a.id, a.username, a.full_name, a.jabatan, a.role, a.is_active, a.must_change_password, a.created_at, a.updated_at, a.last_login_at
+  FROM public.admin_accounts a
+  ORDER BY CASE a.role WHEN 'root' THEN 1 WHEN 'inti' THEN 2 WHEN 'komisi4' THEN 3 ELSE 4 END, a.created_at ASC;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_create_account(
+  p_token TEXT,
+  p_username TEXT,
+  p_full_name TEXT,
+  p_jabatan TEXT,
+  p_role TEXT,
+  p_password TEXT,
+  p_must_change BOOLEAN DEFAULT TRUE
+)
+RETURNS TABLE(
+  id TEXT,
+  username TEXT,
+  full_name TEXT,
+  jabatan TEXT,
+  role TEXT,
+  is_active BOOLEAN,
+  must_change_password BOOLEAN,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ,
+  last_login_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_sess RECORD;
+  v_user TEXT := LOWER(TRIM(COALESCE(p_username, '')));
+  v_id TEXT := 'acc-' || FLOOR(EXTRACT(EPOCH FROM NOW()) * 1000)::TEXT || '-' || FLOOR(100 + RANDOM() * 900)::TEXT;
+BEGIN
+  SELECT * INTO v_sess FROM public._resolve_active_admin_session(p_token) LIMIT 1;
+  IF NOT FOUND OR v_sess.role <> 'root' OR v_sess.must_change_password THEN
+    RAISE EXCEPTION 'Hanya Super Admin aktif yang diizinkan membuat akun baru.';
+  END IF;
+
+  IF v_user !~ '^[a-z0-9._-]{3,32}$' THEN
+    RAISE EXCEPTION 'Username tidak valid (3-32 karakter huruf kecil, angka, titik, _ atau -).';
+  END IF;
+
+  IF LENGTH(COALESCE(p_password, '')) < 8 THEN
+    RAISE EXCEPTION 'Password awal minimal 8 karakter.';
+  END IF;
+
+  IF p_role NOT IN ('root', 'inti', 'komisi4', 'komisi5') THEN
+    RAISE EXCEPTION 'Peran akses tidak valid.';
+  END IF;
+
+  INSERT INTO public.admin_accounts (
+    id, username, full_name, jabatan, role, password_hash, must_change_password, is_active
+  ) VALUES (
+    v_id,
+    v_user,
+    TRIM(p_full_name),
+    TRIM(p_jabatan),
+    p_role,
+    crypt(p_password, gen_salt('bf', 10)),
+    COALESCE(p_must_change, TRUE),
+    TRUE
+  );
+
+  RETURN QUERY
+  SELECT a.id, a.username, a.full_name, a.jabatan, a.role, a.is_active, a.must_change_password, a.created_at, a.updated_at, a.last_login_at
+  FROM public.admin_accounts a WHERE a.id = v_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_update_account(
+  p_token TEXT,
+  p_account_id TEXT,
+  p_full_name TEXT DEFAULT NULL,
+  p_jabatan TEXT DEFAULT NULL,
+  p_role TEXT DEFAULT NULL,
+  p_is_active BOOLEAN DEFAULT NULL,
+  p_new_password TEXT DEFAULT NULL,
+  p_must_change BOOLEAN DEFAULT NULL
+)
+RETURNS TABLE(
+  id TEXT,
+  username TEXT,
+  full_name TEXT,
+  jabatan TEXT,
+  role TEXT,
+  is_active BOOLEAN,
+  must_change_password BOOLEAN,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ,
+  last_login_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_sess RECORD;
+BEGIN
+  SELECT * INTO v_sess FROM public._resolve_active_admin_session(p_token) LIMIT 1;
+  IF NOT FOUND OR v_sess.role <> 'root' OR v_sess.must_change_password THEN
+    RAISE EXCEPTION 'Hanya Super Admin aktif yang diizinkan memperbarui akun.';
+  END IF;
+
+  IF p_account_id = v_sess.account_id AND p_is_active = FALSE THEN
+    RAISE EXCEPTION 'Anda tidak dapat menonaktifkan akun Super Admin yang sedang digunakan.';
+  END IF;
+
+  IF p_new_password IS NOT NULL AND LENGTH(p_new_password) > 0 AND LENGTH(p_new_password) < 8 THEN
+    RAISE EXCEPTION 'Password baru minimal 8 karakter.';
+  END IF;
+
+  UPDATE public.admin_accounts
+  SET full_name = COALESCE(NULLIF(TRIM(p_full_name), ''), full_name),
+      jabatan = COALESCE(NULLIF(TRIM(p_jabatan), ''), jabatan),
+      role = CASE WHEN p_role IN ('root', 'inti', 'komisi4', 'komisi5') THEN p_role ELSE role END,
+      is_active = COALESCE(p_is_active, is_active),
+      password_hash = CASE WHEN p_new_password IS NOT NULL AND LENGTH(p_new_password) >= 8
+        THEN crypt(p_new_password, gen_salt('bf', 10)) ELSE password_hash END,
+      must_change_password = COALESCE(p_must_change, must_change_password),
+      updated_at = NOW()
+  WHERE admin_accounts.id = p_account_id;
+
+  IF p_is_active = FALSE OR (p_new_password IS NOT NULL AND LENGTH(p_new_password) >= 8) THEN
+    DELETE FROM public.admin_sessions WHERE account_id = p_account_id;
+  END IF;
+
+  RETURN QUERY
+  SELECT a.id, a.username, a.full_name, a.jabatan, a.role, a.is_active, a.must_change_password, a.created_at, a.updated_at, a.last_login_at
+  FROM public.admin_accounts a WHERE a.id = p_account_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_delete_account(p_token TEXT, p_account_id TEXT)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_sess RECORD;
+BEGIN
+  SELECT * INTO v_sess FROM public._resolve_active_admin_session(p_token) LIMIT 1;
+  IF NOT FOUND OR v_sess.role <> 'root' OR v_sess.must_change_password THEN
+    RAISE EXCEPTION 'Hanya Super Admin aktif yang diizinkan menghapus akun.';
+  END IF;
+
+  IF p_account_id = v_sess.account_id THEN
+    RAISE EXCEPTION 'Anda tidak dapat menghapus akun yang sedang aktif digunakan.';
+  END IF;
+
+  DELETE FROM public.admin_accounts WHERE id = p_account_id;
+  RETURN FOUND;
+END;
+$$;
+
 GRANT EXECUTE ON FUNCTION public.cast_poll_vote(TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_login(TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_validate_session(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_logout(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_change_own_password(TEXT, TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_list_accounts(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_create_account(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_update_account(TEXT, TEXT, TEXT, TEXT, TEXT, BOOLEAN, TEXT, BOOLEAN) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_delete_account(TEXT, TEXT) TO anon, authenticated;
+
+-- Clean up ALL residual dummy rows from Aspirasi & Polling
+DELETE FROM public.polling_options;
+DELETE FROM public.polling_topics;
+DELETE FROM public.aspirasi;
 
 -- Row Level Security (RLS)
 ALTER TABLE public.aspirasi ENABLE ROW LEVEL SECURITY;
@@ -121,136 +559,74 @@ ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.event_reminders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.gallery ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.berita ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.arsip ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.prestasi ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_sessions ENABLE ROW LEVEL SECURITY;
 
--- Idempotent Public Policies
+-- Lock admin_accounts and admin_sessions completely from direct REST queries
+DROP POLICY IF EXISTS "Deny direct admin_accounts access" ON public.admin_accounts;
+CREATE POLICY "Deny direct admin_accounts access" ON public.admin_accounts FOR ALL USING (false) WITH CHECK (false);
+
+DROP POLICY IF EXISTS "Deny direct admin_sessions access" ON public.admin_sessions;
+CREATE POLICY "Deny direct admin_sessions access" ON public.admin_sessions FOR ALL USING (false) WITH CHECK (false);
+
+-- Content Table Policies
+DROP POLICY IF EXISTS "Public manage aspirasi" ON public.aspirasi;
 DROP POLICY IF EXISTS "Public read aspirasi" ON public.aspirasi;
-CREATE POLICY "Public read aspirasi" ON public.aspirasi FOR SELECT USING (true);
-
 DROP POLICY IF EXISTS "Public insert aspirasi" ON public.aspirasi;
-CREATE POLICY "Public insert aspirasi" ON public.aspirasi FOR INSERT WITH CHECK (true);
-
 DROP POLICY IF EXISTS "Public update aspirasi status" ON public.aspirasi;
-CREATE POLICY "Public update aspirasi status" ON public.aspirasi FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "Public manage aspirasi" ON public.aspirasi FOR ALL USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Public manage polling topics" ON public.polling_topics;
 DROP POLICY IF EXISTS "Public read polling topics" ON public.polling_topics;
-CREATE POLICY "Public read polling topics" ON public.polling_topics FOR SELECT USING (true);
+CREATE POLICY "Public manage polling topics" ON public.polling_topics FOR ALL USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Public manage polling options" ON public.polling_options;
 DROP POLICY IF EXISTS "Public read polling options" ON public.polling_options;
-CREATE POLICY "Public read polling options" ON public.polling_options FOR SELECT USING (true);
+CREATE POLICY "Public manage polling options" ON public.polling_options FOR ALL USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Public manage events" ON public.events;
 DROP POLICY IF EXISTS "Public read events" ON public.events;
-CREATE POLICY "Public read events" ON public.events FOR SELECT USING (true);
+CREATE POLICY "Public manage events" ON public.events FOR ALL USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Public manage gallery" ON public.gallery;
 DROP POLICY IF EXISTS "Public read gallery" ON public.gallery;
-CREATE POLICY "Public read gallery" ON public.gallery FOR SELECT USING (true);
+CREATE POLICY "Public manage gallery" ON public.gallery FOR ALL USING (true) WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Public manage berita" ON public.berita;
 DROP POLICY IF EXISTS "Public read berita" ON public.berita;
-CREATE POLICY "Public read berita" ON public.berita FOR SELECT USING (true);
+CREATE POLICY "Public manage berita" ON public.berita FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public manage arsip" ON public.arsip;
+CREATE POLICY "Public manage arsip" ON public.arsip FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public manage prestasi" ON public.prestasi;
+CREATE POLICY "Public manage prestasi" ON public.prestasi FOR ALL USING (true) WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Public manage own reminders" ON public.event_reminders;
 CREATE POLICY "Public manage own reminders" ON public.event_reminders FOR ALL USING (true) WITH CHECK (true);
 
--- Seed initial Aspirasi & Polling data (idempotent)
-INSERT INTO public.aspirasi (
-  id, kode_lacak, jenis, kategori, judul, isi, is_anonim, nama_pengirim, kelas_pengirim,
-  tanggal, status, tanggapan_resmi, penindaklanjut, riwayat_status
-) VALUES
-  (
-    'asp-1',
-    'ASP-2026-1001',
-    'Saran',
-    'Fasilitas Madrasah',
-    'Penambahan Dispenser Air Minum di Lorong Kelas Lantai 2',
-    'Penyediaan dispenser air minum isi ulang di dekat ruang kelas lantai 2 agar santri dan siswa tidak perlu turun ke kantin setiap kali membutuhkan air minum saat jam istirahat.',
-    FALSE,
-    'Siswa Kelas XI',
-    'XI IPA 1',
-    '2026-09-28',
-    'Selesai',
-    'Aspirasi telah disampaikan kepada bagian sarana madrasah. Dispenser tambahan telah dipasang dan beroperasi di koridor barat lantai 2.',
-    'Komisi 4 OPDIM & Waka Sarpras',
-    '[{"status":"Diterima","waktu":"28 Sep 2026","keterangan":"Aspirasi masuk ke sistem Kotak Aspirasi Komisi 4."},{"status":"Ditinjau","waktu":"29 Sep 2026","keterangan":"Diverifikasi kelayakannya oleh Komisi 4."},{"status":"Didiskusikan","waktu":"30 Sep 2026","keterangan":"Dibahas dalam rapat koordinasi pengurus OPDIM."},{"status":"Tindak Lanjut","waktu":"02 Okt 2026","keterangan":"Disampaikan secara resmi dalam audiensi bersama Waka Sarana & Prasarana."},{"status":"Selesai","waktu":"05 Okt 2026","keterangan":"Dispenser terpasang dan dapat digunakan bersama."}]'::jsonb
-  ),
-  (
-    'asp-2',
-    'ASP-2026-1002',
-    'Ide',
-    'Kegiatan Siswa',
-    'Penguatan Mading Kreasi & Sesi Mentoring Belajar Sebaya',
-    'Mengusulkan diadakannya rubrik tips belajar mingguan di mading dan sesi belajar kelompok sebaya menjelang ujian semester.',
-    TRUE,
-    NULL,
-    NULL,
-    '2026-10-01',
-    'Tindak Lanjut',
-    'Ide disinkronkan dengan program Papan Informasi Edukasi Komisi 3 dan sedang dirumuskan format jadwal belajarnya.',
-    'Komisi 4 & Komisi 3',
-    '[{"status":"Diterima","waktu":"01 Okt 2026","keterangan":"Aspirasi diterima dan terdata secara anonim."},{"status":"Ditinjau","waktu":"02 Okt 2026","keterangan":"Dinilai sangat konstruktif untuk akademik siswa."},{"status":"Didiskusikan","waktu":"04 Okt 2026","keterangan":"Dikoordinasikan dengan Komisi 3 bagian Edukasi."},{"status":"Tindak Lanjut","waktu":"06 Okt 2026","keterangan":"Penyusunan jadwal rubrik mading dan fasilitasi tutor sebaya."}]'::jsonb
-  ),
-  (
-    'asp-3',
-    'ASP-2026-1003',
-    'Saran',
-    'Kebersihan & Lingkungan',
-    'Wadah Sampah Khusus Daur Ulang untuk Trash to Cash',
-    'Agar program Trash to Cash Komisi 3 berjalan optimal, perlu ditandai tempat sampah khusus botol plastik di setiap sudut gazebo madrasah.',
-    FALSE,
-    'Perwakilan Kelas X',
-    'X-2',
-    '2026-10-03',
-    'Didiskusikan',
-    'Sedang dibahas bersama panitia Trash to Cash untuk pengadaan stiker penanda dan karung pilah.',
-    'Komisi 4 & Tim Trash to Cash',
-    '[{"status":"Diterima","waktu":"03 Okt 2026","keterangan":"Aspirasi diterima oleh tim piket aspirasi."},{"status":"Ditinjau","waktu":"04 Okt 2026","keterangan":"Diteruskan ke Ketua Komisi 4 Nayla Syaqila Husain."},{"status":"Didiskusikan","waktu":"07 Okt 2026","keterangan":"Sedang dimusyawarahkan pembiayaan pengadaan penanda bersama Bendahara."}]'::jsonb
-  ),
-  (
-    'asp-4',
-    'ASP-2026-1004',
-    'Keluhan',
-    'Fasilitas Madrasah',
-    'Optimalisasi Jaringan Internet WiFi di Perpustakaan',
-    'Kecepatan internet WiFi di perpustakaan sering melambat saat jam istirahat ketika banyak siswa mengakses referensi materi digital.',
-    TRUE,
-    NULL,
-    NULL,
-    '2026-10-06',
-    'Ditinjau',
-    'Dalam proses inventarisasi dan koordinasi bersama tim IT madrasah.',
-    'Komisi 4 OPDIM',
-    '[{"status":"Diterima","waktu":"06 Okt 2026","keterangan":"Laporan keluhan masuk ke Kotak Aspirasi."},{"status":"Ditinjau","waktu":"07 Okt 2026","keterangan":"Komisi 4 melakukan verifikasi kendala sinyal di lokasi perpustakaan."}]'::jsonb
-  )
+-- Supabase Storage Bucket for Optimized 1080p WebP Media & Documents
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('vistara-media', 'vistara-media', true)
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.polling_topics (id, slug, question, description, category, status, closes_at) VALUES
-  (
-    'poll-1',
-    'fokus-agenda-vistara-talks-3',
-    'Tema utama apa yang paling kamu harapkan untuk VISTARA Talks #3?',
-    'Hasil jajak pendapat ini menjadi dasar Komisi 2 & Komisi 4 menentukan topik dan narasumber sesi diskusi berikutnya.',
-    'Kegiatan Siswa',
-    'active',
-    '30 November 2026'
-  ),
-  (
-    'poll-2',
-    'prioritas-fasilitas-madrasah-triwulan-2',
-    'Fasilitas madrasah mana yang perlu diprioritaskan pada audiensi Triwulan II?',
-    'Pilihan siswa akan dirangkum oleh Komisi 4 dalam rekomendasi resmi ke bagian Sarana & Prasarana.',
-    'Fasilitas Madrasah',
-    'active',
-    '15 Desember 2026'
-  )
-ON CONFLICT (id) DO NOTHING;
+DROP POLICY IF EXISTS "Public read vistara-media" ON storage.objects;
+CREATE POLICY "Public read vistara-media" ON storage.objects
+  FOR SELECT USING (bucket_id = 'vistara-media');
 
-INSERT INTO public.polling_options (id, poll_id, label, votes, sort_order) VALUES
-  ('poll-1-opt-1', 'poll-1', 'Persiapan Olimpiade & Masuk PTN Favorit', 64, 1),
-  ('poll-1-opt-2', 'poll-1', 'Kewirausahaan Muda & Ekonomi Kreatif Pelajar', 49, 2),
-  ('poll-1-opt-3', 'poll-1', 'Literasi Digital, AI Produktif & Keamanan Siber', 72, 3),
-  ('poll-1-opt-4', 'poll-1', 'Kesehatan Mental & Manajemen Waktu Santri-Siswa', 41, 4),
-  ('poll-2-opt-1', 'poll-2', 'Perluasan Area Baca & Stopkontak di Perpustakaan', 83, 1),
-  ('poll-2-opt-2', 'poll-2', 'Penambahan Loker Penyimpanan Barang per Kelas', 58, 2),
-  ('poll-2-opt-3', 'poll-2', 'Perbaikan Peneduh & Penerangan Area Gazebo', 47, 3)
-ON CONFLICT (id) DO NOTHING;
+DROP POLICY IF EXISTS "Public upload vistara-media" ON storage.objects;
+CREATE POLICY "Public upload vistara-media" ON storage.objects
+  FOR INSERT WITH CHECK (bucket_id = 'vistara-media');
+
+DROP POLICY IF EXISTS "Public update vistara-media" ON storage.objects;
+CREATE POLICY "Public update vistara-media" ON storage.objects
+  FOR UPDATE USING (bucket_id = 'vistara-media') WITH CHECK (bucket_id = 'vistara-media');
+
+DROP POLICY IF EXISTS "Public delete vistara-media" ON storage.objects;
+CREATE POLICY "Public delete vistara-media" ON storage.objects
+  FOR DELETE USING (bucket_id = 'vistara-media');
 
 -- Enable Supabase Realtime replication for live sync modules
 DO $$
@@ -261,6 +637,8 @@ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.events;
   ALTER PUBLICATION supabase_realtime ADD TABLE public.gallery;
   ALTER PUBLICATION supabase_realtime ADD TABLE public.berita;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.arsip;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.prestasi;
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;

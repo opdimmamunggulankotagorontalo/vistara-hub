@@ -3,28 +3,34 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Search } from 'lucide-react';
 import { motion } from 'motion/react';
 import { PageHeader } from '../../components/shared/PageHeader';
-import { Badge, EmptyState } from '../../components/ui';
-import { beritaData } from '../../data';
+import { Badge, EmptyState, LoadingState } from '../../components/ui';
 import type { BeritaItem } from '../../types';
 import { ScrollReveal, TiltSpotlightCard } from '../../components/motion/MotionPrimitives';
 import { useMotionSystem } from '../../components/motion/MotionProvider';
 import { fetchBerita, subscribeToTableChanges } from '../../services/dataClient';
 
 function formatDate(d: string) {
-  return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(d));
+  const parsed = new Date(d);
+  if (Number.isNaN(parsed.getTime())) return d;
+  return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }).format(parsed);
 }
 
 export default function BeritaPage() {
   const { reducedMotion } = useMotionSystem();
-  const [articles, setArticles] = useState<BeritaItem[]>(beritaData);
+  const [articles, setArticles] = useState<BeritaItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('Semua');
 
   useEffect(() => {
     let active = true;
-    fetchBerita().then((items) => {
-      if (active) setArticles(items);
-    });
+    fetchBerita()
+      .then((items) => {
+        if (active) setArticles(items);
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
     const unsubscribe = subscribeToTableChanges('berita', () => {
       fetchBerita().then((items) => {
         if (active) setArticles(items);
@@ -111,15 +117,21 @@ export default function BeritaPage() {
           </div>
 
           {/* Count */}
-          <p style={{ fontFamily: 'var(--font-header)', fontSize: '0.8rem', color: 'var(--mid-grey)', marginBottom: '1.5rem' }}>
-            <strong style={{ color: 'var(--deep-violet)' }}>{filtered.length}</strong> berita ditemukan
+          <p className="tabular-nums" style={{ fontFamily: 'var(--font-header)', fontSize: '0.8rem', color: 'var(--mid-grey)', marginBottom: '1.5rem' }}>
+            {isLoading ? 'Memuat berita...' : <><strong style={{ color: 'var(--deep-violet)' }}>{filtered.length}</strong> berita ditemukan</>}
           </p>
 
           {/* Grid */}
-          {filtered.length === 0 ? (
+          {isLoading ? (
+            <LoadingState />
+          ) : filtered.length === 0 ? (
             <EmptyState
-              title="Berita tidak ditemukan"
-              description="Coba ubah kata kunci pencarian atau pilih kategori berita lain."
+              title={articles.length === 0 ? 'Belum ada berita diterbitkan' : 'Berita tidak ditemukan'}
+              description={
+                articles.length === 0
+                  ? 'Publikasi berita terbaru dari Komisi 5 Media & Humas akan tampil di sini.'
+                  : 'Coba ubah kata kunci pencarian atau pilih kategori berita lain.'
+              }
             />
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
@@ -132,7 +144,7 @@ export default function BeritaPage() {
                         whileHover={reducedMotion ? undefined : { scale: 1.03 }}
                         transition={{ duration: 0.3 }}
                         style={{
-                          height: '160px',
+                          height: '168px',
                           borderRadius: '10px',
                           marginBottom: '1rem',
                           background: 'linear-gradient(135deg, var(--deep-violet) 0%, var(--vistara-purple) 100%)',
@@ -143,12 +155,22 @@ export default function BeritaPage() {
                           position: 'relative',
                         }}
                       >
-                        <img src="/logo-vistara.svg" alt="" style={{ height: '48px', opacity: 0.28, filter: 'brightness(0) invert(1)' }} />
+                        {berita.thumbnail ? (
+                          <img
+                            src={berita.thumbnail}
+                            alt={berita.title}
+                            referrerPolicy="no-referrer"
+                            loading="lazy"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <img src="/logo-vistara.svg" alt="" style={{ height: '48px', opacity: 0.28, filter: 'brightness(0) invert(1)' }} />
+                        )}
                       </motion.div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.625rem' }}>
                         <Badge variant="ghost">{berita.category}</Badge>
-                        <span style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', color: 'var(--light-grey)' }}>
+                        <span className="tabular-nums" style={{ fontFamily: 'var(--font-header)', fontSize: '0.7rem', color: 'var(--mid-grey)' }}>
                           {formatDate(berita.date)}
                         </span>
                       </div>
