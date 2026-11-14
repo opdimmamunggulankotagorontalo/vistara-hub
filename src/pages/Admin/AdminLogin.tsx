@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Lock, ArrowLeft, User, Eye, EyeOff } from 'lucide-react';
+import { Lock, ArrowLeft, User, Eye, EyeOff, Cloud, AlertTriangle, WifiOff } from 'lucide-react';
 import type { AdminSession } from '../../types';
-import { loginAdminAccount } from '../../services/dataClient';
+import {
+  checkAdminBackendDiagnostics,
+  loginAdminAccount,
+  type AdminAuthDiagnostics,
+} from '../../services/dataClient';
 import { normalizeUsername } from '../../utils/adminAuth';
 
 interface AdminLoginProps {
@@ -15,6 +19,22 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [diagnostics, setDiagnostics] = useState<AdminAuthDiagnostics | null>(null);
+  const [checkingConnection, setCheckingConnection] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    checkAdminBackendDiagnostics()
+      .then((res) => {
+        if (active) setDiagnostics(res);
+      })
+      .finally(() => {
+        if (active) setCheckingConnection(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +55,13 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
     }
   };
 
+  const diagPalette =
+    diagnostics?.mode === 'supabase-ready'
+      ? { bg: '#EFFAF1', border: '#BDE5C8', color: '#1E6B34', Icon: Cloud }
+      : diagnostics?.mode === 'supabase-unreachable'
+        ? { bg: '#FFF5F5', border: '#FFCDD2', color: '#C62828', Icon: WifiOff }
+        : { bg: '#FFF8E6', border: '#F5DCA4', color: '#8A5300', Icon: AlertTriangle };
+
   return (
     <div
       style={{
@@ -50,14 +77,14 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
       <div
         style={{
           width: '100%',
-          maxWidth: '440px',
+          maxWidth: '460px',
           background: 'white',
           border: '1px solid #E5DDF5',
           borderRadius: '16px',
           padding: 'clamp(1.25rem, 4vw, 2rem)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.35rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <img src="/logo-vistara.svg" alt="VISTARA" width={32} height={32} />
             <div>
@@ -91,9 +118,55 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
         <h1 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--deep-violet)', marginBottom: '0.35rem' }}>
           Masuk Dashboard Admin
         </h1>
-        <p style={{ fontSize: '0.84rem', color: 'var(--mid-grey)', marginBottom: '1.5rem', lineHeight: 1.5 }}>
-          Masuk menggunakan akun pengurus OPDIM yang telah terdaftar dan terenkripsi.
+        <p style={{ fontSize: '0.84rem', color: 'var(--mid-grey)', marginBottom: '1rem', lineHeight: 1.5 }}>
+          Masuk menggunakan akun pengurus OPDIM yang tersinkron di Supabase Cloud.
         </p>
+
+        {/* Authentication Backend Diagnostics */}
+        {checkingConnection ? (
+          <div
+            style={{
+              padding: '0.7rem 0.9rem',
+              borderRadius: '10px',
+              background: '#FAF8FF',
+              border: '1px solid #E5DDF5',
+              color: 'var(--mid-grey)',
+              fontSize: '0.79rem',
+              marginBottom: '1.1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+          >
+            <Cloud size={15} style={{ color: 'var(--vistara-purple)', flexShrink: 0 }} />
+            <span>Memeriksa koneksi database autentikasi...</span>
+          </div>
+        ) : diagnostics ? (
+          <div
+            data-auth-mode={diagnostics.mode}
+            style={{
+              padding: '0.75rem 0.9rem',
+              borderRadius: '10px',
+              background: diagPalette.bg,
+              border: `1px solid ${diagPalette.border}`,
+              color: diagPalette.color,
+              fontSize: '0.79rem',
+              marginBottom: '1.1rem',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '0.55rem',
+              lineHeight: 1.45,
+            }}
+          >
+            <diagPalette.Icon size={16} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
+            <div>
+              <div style={{ fontFamily: 'var(--font-header)', fontWeight: 700, fontSize: '0.8rem' }}>
+                {diagnostics.title}
+              </div>
+              <div style={{ opacity: 0.92, marginTop: '0.15rem' }}>{diagnostics.detail}</div>
+            </div>
+          </div>
+        ) : null}
 
         {error && (
           <div
@@ -107,6 +180,7 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
               fontSize: '0.82rem',
               marginBottom: '1.15rem',
               fontWeight: 500,
+              lineHeight: 1.45,
             }}
           >
             {error}

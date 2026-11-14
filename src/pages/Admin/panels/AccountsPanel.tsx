@@ -14,13 +14,17 @@ import {
   CheckCircle2,
   Pencil,
   Lock,
+  Cloud,
+  AlertTriangle,
 } from 'lucide-react';
 import type { AdminAccount, AdminRole } from '../../../types';
 import {
+  checkAdminBackendDiagnostics,
   createAdminAccount,
   deleteAdminAccount,
   fetchAdminAccounts,
   updateAdminAccount,
+  type AdminAuthDiagnostics,
 } from '../../../services/dataClient';
 import {
   ADMIN_ROLES_META,
@@ -96,12 +100,25 @@ export default function AccountsPanel({
   const [modalError, setModalError] = useState('');
   const [isModalSaving, setIsModalSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<AdminAuthDiagnostics | null>(null);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     let active = true;
-    fetchAdminAccounts()
-      .then((list) => {
-        if (active) setAccounts(list);
+    Promise.all([
+      fetchAdminAccounts().catch((err) => {
+        if (active) {
+          setLoadError(err instanceof Error ? err.message : 'Gagal memuat daftar akun admin.');
+        }
+        return [] as AdminAccount[];
+      }),
+      checkAdminBackendDiagnostics(),
+    ])
+      .then(([list, diag]) => {
+        if (active) {
+          setAccounts(list);
+          setDiagnostics(diag);
+        }
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -288,6 +305,52 @@ export default function AccountsPanel({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      {/* Sync Diagnostics Strip */}
+      {diagnostics && (
+        <div
+          style={{
+            padding: '0.7rem 0.95rem',
+            borderRadius: '11px',
+            background: diagnostics.mode === 'supabase-ready' ? '#EFFAF1' : '#FFF8E6',
+            border: diagnostics.mode === 'supabase-ready' ? '1px solid #BDE5C8' : '1px solid #F5DCA4',
+            color: diagnostics.mode === 'supabase-ready' ? '#1E6B34' : '#8A5300',
+            fontSize: '0.8rem',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '0.55rem',
+            lineHeight: 1.45,
+          }}
+        >
+          {diagnostics.mode === 'supabase-ready' ? (
+            <Cloud size={16} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
+          ) : (
+            <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
+          )}
+          <div>
+            <span style={{ fontFamily: 'var(--font-header)', fontWeight: 700 }}>{diagnostics.title}</span>
+            {' — '}
+            <span>{diagnostics.detail}</span>
+          </div>
+        </div>
+      )}
+
+      {loadError && (
+        <div
+          role="alert"
+          style={{
+            padding: '0.75rem 0.95rem',
+            borderRadius: '10px',
+            background: '#FFEBEE',
+            border: '1px solid #FFCDD2',
+            color: '#C62828',
+            fontSize: '0.82rem',
+            fontWeight: 500,
+          }}
+        >
+          {loadError}
+        </div>
+      )}
+
       {/* KPI Strip */}
       <div
         className="admin-kpi-grid"

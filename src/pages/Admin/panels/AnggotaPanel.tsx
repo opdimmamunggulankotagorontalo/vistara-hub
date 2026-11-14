@@ -9,6 +9,8 @@ import {
   Search,
   UserCheck,
   CheckCircle2,
+  Network,
+  List,
 } from 'lucide-react';
 import type { AnggotaLevel, AnggotaOpdim, AnggotaUnit } from '../../../types';
 import { ANGGOTA_LEVEL_LABELS, ANGGOTA_UNIT_META } from '../../../data/anggotaSeed';
@@ -20,6 +22,7 @@ import {
   updateAnggotaOpdim,
 } from '../../../services/dataClient';
 import { EmptyState, LoadingState } from '../../../components/ui';
+import OrgStructureCanvas, { type OrgTreeNodeKey } from '../../../components/shared/OrgStructureCanvas';
 import MediaUploadField from '../MediaUploadField';
 
 const UNIT_ORDER: AnggotaUnit[] = [
@@ -53,6 +56,8 @@ function getInitials(name: string): string {
 export default function AnggotaPanel() {
   const [items, setItems] = useState<AnggotaOpdim[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewTab, setViewTab] = useState<'list' | 'chart'>('list');
+  const [chartSelectedNode, setChartSelectedNode] = useState<OrgTreeNodeKey | null>(null);
   const [unitFilter, setUnitFilter] = useState<'all' | AnggotaUnit>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -265,19 +270,85 @@ export default function AnggotaPanel() {
         </div>
       </div>
 
-      {/* Action Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div style={{ fontSize: '0.84rem', color: 'var(--mid-grey)' }}>
-          Data Kepala Madrasah, Pembina, Pengurus Inti, dan Komisi 1–5 yang tampil di halaman publik{' '}
-          <strong style={{ color: 'var(--deep-violet)' }}>/beranda/anggota</strong>.
+      {/* Segmented View Tabs + Action Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.65rem' }}>
+        <div
+          role="tablist"
+          aria-label="Tampilan menu Anggota OPDIM"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.25rem',
+            padding: '0.25rem',
+            borderRadius: '10px',
+            background: '#F2ECFC',
+            border: '1px solid #E5DDF5',
+          }}
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewTab === 'list'}
+            onClick={() => setViewTab('list')}
+            style={{
+              minHeight: '38px',
+              padding: '0 0.85rem',
+              borderRadius: '8px',
+              border: 'none',
+              background: viewTab === 'list' ? '#FFFFFF' : 'transparent',
+              color: viewTab === 'list' ? 'var(--deep-violet)' : 'var(--mid-grey)',
+              fontFamily: 'var(--font-header)',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              cursor: 'pointer',
+              boxShadow: viewTab === 'list' ? '0 1px 4px rgba(46,26,71,0.08)' : 'none',
+            }}
+          >
+            <List size={15} /> Daftar &amp; Kelola
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewTab === 'chart'}
+            onClick={() => setViewTab('chart')}
+            style={{
+              minHeight: '38px',
+              padding: '0 0.85rem',
+              borderRadius: '8px',
+              border: 'none',
+              background: viewTab === 'chart' ? '#FFFFFF' : 'transparent',
+              color: viewTab === 'chart' ? 'var(--deep-violet)' : 'var(--mid-grey)',
+              fontFamily: 'var(--font-header)',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              cursor: 'pointer',
+              boxShadow: viewTab === 'chart' ? '0 1px 4px rgba(46,26,71,0.08)' : 'none',
+            }}
+          >
+            <Network size={15} /> Bagan Struktur
+          </button>
         </div>
+
         <button
           type="button"
-          onClick={() => (showForm ? setShowForm(false) : openNewForm())}
+          onClick={() => {
+            setViewTab('list');
+            if (showForm) {
+              setShowForm(false);
+            } else {
+              openNewForm();
+            }
+          }}
           className="btn btn-primary btn-sm"
           style={{ minHeight: '42px' }}
         >
-          {showForm ? <><X size={15} /> Tutup Form</> : <><Plus size={15} /> Tambah Anggota</>}
+          {showForm && viewTab === 'list' ? <><X size={15} /> Tutup Form</> : <><Plus size={15} /> Tambah Anggota</>}
         </button>
       </div>
 
@@ -300,6 +371,60 @@ export default function AnggotaPanel() {
           <span>{feedback}</span>
         </div>
       )}
+
+      {viewTab === 'chart' ? (
+        <div className="admin-surface" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+          <OrgStructureCanvas
+            members={items.filter((i) => i.isActive)}
+            selectedNode={chartSelectedNode}
+            onSelectNode={(node) =>
+              setChartSelectedNode((prev) => (prev === node ? null : node))
+            }
+          />
+          {chartSelectedNode && (
+            <div
+              style={{
+                padding: '0.9rem 1rem',
+                borderRadius: '10px',
+                background: '#FAF8FF',
+                border: '1px solid #E5DDF5',
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.65rem',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--vistara-purple)', fontFamily: 'var(--font-header)', textTransform: 'uppercase' }}>
+                  Unit Terpilih di Bagan
+                </div>
+                <div style={{ fontSize: '0.96rem', fontWeight: 700, color: 'var(--deep-violet)', marginTop: '0.1rem' }}>
+                  {chartSelectedNode === 'kepala_madrasah' || chartSelectedNode === 'pembina'
+                    ? ANGGOTA_UNIT_META.pimpinan.label
+                    : ANGGOTA_UNIT_META[chartSelectedNode].label}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                style={{ minHeight: '40px' }}
+                onClick={() => {
+                  const targetUnit: AnggotaUnit =
+                    chartSelectedNode === 'kepala_madrasah' || chartSelectedNode === 'pembina'
+                      ? 'pimpinan'
+                      : chartSelectedNode;
+                  setUnitFilter(targetUnit);
+                  setViewTab('list');
+                }}
+              >
+                Kelola Personel Unit Ini
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
 
       {/* Add / Edit Form */}
       {showForm && (
@@ -465,7 +590,7 @@ export default function AnggotaPanel() {
           />
         </div>
 
-        <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.35rem', overflowX: 'auto', paddingBottom: '0.15rem', scrollbarWidth: 'none' }}>
           <button
             type="button"
             onClick={() => setUnitFilter('all')}
@@ -706,6 +831,8 @@ export default function AnggotaPanel() {
             );
           })}
         </div>
+      )}
+        </>
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.78rem', color: 'var(--mid-grey)' }}>

@@ -251,6 +251,20 @@ function saveVotedPollChoice(pollId: string, optionId: string): void {
 
 type AuthProvider = 'supabase' | 'express';
 
+export type AdminAuthBackendMode =
+  | 'supabase-ready'
+  | 'supabase-missing-rpc'
+  | 'supabase-unreachable'
+  | 'local-only';
+
+export interface AdminAuthDiagnostics {
+  mode: AdminAuthBackendMode;
+  supabaseConfigured: boolean;
+  activeProvider: AuthProvider | 'none';
+  title: string;
+  detail: string;
+}
+
 function getStoredAuthProvider(): AuthProvider {
   try {
     const val = sessionStorage.getItem(ADMIN_AUTH_PROVIDER_KEY);
@@ -258,6 +272,10 @@ function getStoredAuthProvider(): AuthProvider {
   } catch {
     return 'express';
   }
+}
+
+export function getStoredAuthProviderMode(): AuthProvider {
+  return getStoredAuthProvider();
 }
 
 function saveAuthProvider(provider: AuthProvider): void {
@@ -311,7 +329,7 @@ function adminHeaders(token?: string): HeadersInit {
   return headers;
 }
 
-function isSupabaseRpcUnavailable(err: { code?: string; message?: string } | null | undefined): boolean {
+function isSupabaseRpcMissing(err: { code?: string; message?: string } | null | undefined): boolean {
   if (!err) return false;
   const msg = String(err.message || '').toLowerCase();
   const code = String(err.code || '').toUpperCase();
@@ -319,10 +337,73 @@ function isSupabaseRpcUnavailable(err: { code?: string; message?: string } | nul
     code === 'PGRST202' ||
     code === '42883' ||
     msg.includes('could not find the function') ||
-    msg.includes('does not exist') ||
-    msg.includes('404') ||
-    msg.includes('failed to fetch')
+    msg.includes('does not exist')
   );
+}
+
+function isSupabaseNetworkError(err: { code?: string; message?: string } | null | undefined): boolean {
+  if (!err) return false;
+  const msg = String(err.message || '').toLowerCase();
+  return msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed');
+}
+
+export async function checkAdminBackendDiagnostics(): Promise<AdminAuthDiagnostics> {
+  const hasSession = Boolean(getStoredAdminSession());
+  const storedProvider: AuthProvider | 'none' = hasSession ? getStoredAuthProvider() : 'none';
+
+  if (!supabase || !isSupabaseConfigured) {
+    return {
+      mode: 'local-only',
+      supabaseConfigured: false,
+      activeProvider: storedProvider,
+      title: 'Supabase Belum Terkonfigurasi (Mode Lokal)',
+      detail:
+        'Variabel VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY tidak aktif pada build ini. Akun lokal SQLite tidak dapat digunakan di Vercel — pasang kedua env tersebut di Vercel Project Settings lalu Redeploy.',
+    };
+  }
+
+  try {
+    const { error } = await supabase.rpc('admin_validate_session', { p_token: '__probe__' });
+    if (!error || (!isSupabaseRpcMissing(error) && !isSupabaseNetworkError(error))) {
+      return {
+        mode: 'supabase-ready',
+        supabaseConfigured: true,
+        activeProvider: hasSession ? storedProvider : 'supabase',
+        title: 'Supabase Cloud Terhubung',
+        detail:
+          'Autentikasi dan pengelolaan akun terhubung langsung ke Supabase Cloud sehingga tersinkron di AI Studio maupun Vercel.',
+      };
+    }
+
+    if (isSupabaseRpcMissing(error)) {
+      return {
+        mode: 'supabase-missing-rpc',
+        supabaseConfigured: true,
+        activeProvider: storedProvider,
+        title: 'Skema RPC Admin Supabase Belum Terpasang',
+        detail:
+          'Project Supabase terhubung, tetapi fungsi RPC admin_login & admin_create_account belum ditemukan. Jalankan isi file supabase/schema.sql di Supabase SQL Editor.',
+      };
+    }
+
+    return {
+      mode: 'supabase-unreachable',
+      supabaseConfigured: true,
+      activeProvider: storedProvider,
+      title: 'Server Supabase Tidak Dapat Dijangkau',
+      detail:
+        'Gagal menghubungi server Supabase. Periksa koneksi internet atau konfigurasi URL project Supabase.',
+    };
+  } catch {
+    return {
+      mode: 'supabase-unreachable',
+      supabaseConfigured: true,
+      activeProvider: storedProvider,
+      title: 'Server Supabase Tidak Dapat Dijangkau',
+      detail:
+        'Gagal menghubungi server Supabase. Periksa koneksi internet atau konfigurasi URL project Supabase.',
+    };
+  }
 }
 
 function mapSupabaseAccountRow(row: Record<string, unknown>): AdminAccount {
@@ -347,13 +428,38 @@ export async function loginAdminAccount(username: string, password: string): Pro
   }
 
   if (supabase && isSupabaseConfigured) {
+    let data: unknown = null;
+    let error: { code?: string; message?: string } | null = null;
     try {
-      const { data, error } = await supabase.rpc('admin_login', {
+      const rpcRes = await supabase.rpc('admin_login', {
         p_username: cleanUser,
         p_password: password,
       });
-      if (!error && Array.isArray(data) && data[0]) {
-        const row = data[0] as {
+      data = rpcRes.data;
+      error = rpcRes.error;
+    } catch (err) {
+      throw new Error(
+        err instanceof Error && !isSupabaseNetworkError(err)
+          ? err.message
+          : 'Gagal menghubungi server autentikasi Supabase. Periksa koneksi internet Anda.'
+      );
+    }
+
+    if (error) {
+      if (isSupabaseRpcMissing(error)) {
+        throw new Error(
+          'Fungsi autentikasi Supabase (admin_login) belum terpasang. Jalankan file supabase/schema.sql di Supabase SQL Editor agar akun tersinkron ke Vercel.'
+        );
+      }
+      if (isSupabaseNetworkError(error)) {
+        throw new Error('Gagal menghubungi server autentikasi Supabase. Periksa koneksi internet Anda.');
+      }
+      throw new Error(error.message || 'Username atau password tidak sesuai.');
+    }
+
+    const rows = Array.isArray(data) ? data : [];
+    const row = rows[0] as
+      | {
           account_id: string;
           username: string;
           full_name: string;
@@ -361,30 +467,27 @@ export async function loginAdminAccount(username: string, password: string): Pro
           role: AdminRole;
           token: string;
           must_change_password: boolean;
-        };
-        const session: AdminSession = {
-          accountId: row.account_id,
-          username: row.username,
-          fullName: row.full_name,
-          jabatan: row.jabatan,
-          role: row.role,
-          roleLabel: ADMIN_ROLES_META[row.role]?.label || 'Pengurus OPDIM',
-          token: row.token,
-          mustChangePassword: Boolean(row.must_change_password),
-          loggedInAt: Date.now(),
-        };
-        saveAuthProvider('supabase');
-        saveAdminSession(session);
-        return session;
-      }
-      if (error && !isSupabaseRpcUnavailable(error)) {
-        throw new Error(error.message || 'Username atau password tidak sesuai.');
-      }
-    } catch (err) {
-      if (err instanceof Error && !err.message.toLowerCase().includes('fetch') && !isSupabaseRpcUnavailable({ message: err.message })) {
-        throw err;
-      }
+        }
+      | undefined;
+
+    if (!row) {
+      throw new Error('Username atau password tidak sesuai.');
     }
+
+    const session: AdminSession = {
+      accountId: row.account_id,
+      username: row.username,
+      fullName: row.full_name,
+      jabatan: row.jabatan,
+      role: row.role,
+      roleLabel: ADMIN_ROLES_META[row.role]?.label || 'Pengurus OPDIM',
+      token: row.token,
+      mustChangePassword: Boolean(row.must_change_password),
+      loggedInAt: Date.now(),
+    };
+    saveAuthProvider('supabase');
+    saveAdminSession(session);
+    return session;
   }
 
   const res = await fetch('/api/admin/auth/login', {
@@ -392,6 +495,12 @@ export async function loginAdminAccount(username: string, password: string): Pro
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username: cleanUser, password }),
   });
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(
+      'Server login lokal tidak tersedia di hosting statis Vercel. Tambahkan VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY di Vercel Environment Variables lalu Redeploy.'
+    );
+  }
   const body = (await res.json().catch(() => null)) as { session?: AdminSession; error?: string } | null;
   if (!res.ok || !body?.session) {
     throw new Error(body?.error || 'Username atau password tidak sesuai.');
@@ -406,7 +515,11 @@ export async function verifyAdminSession(): Promise<AdminSession | null> {
   if (!stored) return null;
   const provider = getStoredAuthProvider();
 
-  if (provider === 'supabase' && supabase && isSupabaseConfigured) {
+  if (supabase && isSupabaseConfigured) {
+    if (provider !== 'supabase') {
+      clearAdminSession();
+      return null;
+    }
     try {
       const { data, error } = await supabase.rpc('admin_validate_session', {
         p_token: stored.token,
@@ -440,6 +553,7 @@ export async function verifyAdminSession(): Promise<AdminSession | null> {
     } catch {
       return stored;
     }
+    return stored;
   }
 
   try {
@@ -450,7 +564,8 @@ export async function verifyAdminSession(): Promise<AdminSession | null> {
       clearAdminSession();
       return null;
     }
-    if (res.ok) {
+    const contentType = res.headers.get('content-type') || '';
+    if (res.ok && contentType.includes('application/json')) {
       const data = (await res.json()) as { session?: AdminSession };
       if (data.session) {
         saveAdminSession(data.session);
@@ -497,8 +612,10 @@ export async function changeOwnAdminPassword(
     throw new Error('Sesi admin tidak ditemukan. Silakan masuk kembali.');
   }
 
-  const provider = getStoredAuthProvider();
-  if (provider === 'supabase' && supabase && isSupabaseConfigured) {
+  if (supabase && isSupabaseConfigured) {
+    if (getStoredAuthProvider() !== 'supabase') {
+      throw new Error('Sesi bukan berasal dari Supabase Cloud. Silakan keluar dan masuk kembali.');
+    }
     const { data, error } = await supabase.rpc('admin_change_own_password', {
       p_token: stored.token,
       p_current_password: currentPassword,
@@ -539,7 +656,10 @@ export async function fetchAdminAccounts(): Promise<AdminAccount[]> {
   if (!stored) throw new Error('Sesi admin tidak valid.');
   const provider = getStoredAuthProvider();
 
-  if (provider === 'supabase' && supabase && isSupabaseConfigured) {
+  if (supabase && isSupabaseConfigured) {
+    if (provider !== 'supabase') {
+      throw new Error('Sesi berasal dari database lokal sementara. Keluar lalu masuk kembali agar terhubung ke Supabase Cloud.');
+    }
     const { data, error } = await supabase.rpc('admin_list_accounts', {
       p_token: stored.token,
     });
@@ -562,7 +682,10 @@ export async function createAdminAccount(input: CreateAdminAccountInput): Promis
   if (!stored) throw new Error('Sesi admin tidak valid.');
   const provider = getStoredAuthProvider();
 
-  if (provider === 'supabase' && supabase && isSupabaseConfigured) {
+  if (supabase && isSupabaseConfigured) {
+    if (provider !== 'supabase') {
+      throw new Error('Akun hanya dapat dibuat via Supabase Cloud agar dapat dipakai di Vercel. Keluar lalu masuk kembali.');
+    }
     const { data, error } = await supabase.rpc('admin_create_account', {
       p_token: stored.token,
       p_username: normalizeUsername(input.username),
@@ -605,7 +728,10 @@ export async function updateAdminAccount(
   if (!stored) throw new Error('Sesi admin tidak valid.');
   const provider = getStoredAuthProvider();
 
-  if (provider === 'supabase' && supabase && isSupabaseConfigured) {
+  if (supabase && isSupabaseConfigured) {
+    if (provider !== 'supabase') {
+      throw new Error('Perubahan akun hanya dapat dilakukan via Supabase Cloud. Keluar lalu masuk kembali.');
+    }
     const { data, error } = await supabase.rpc('admin_update_account', {
       p_token: stored.token,
       p_account_id: accountId,
@@ -645,7 +771,10 @@ export async function deleteAdminAccount(accountId: string): Promise<void> {
   if (!stored) throw new Error('Sesi admin tidak valid.');
   const provider = getStoredAuthProvider();
 
-  if (provider === 'supabase' && supabase && isSupabaseConfigured) {
+  if (supabase && isSupabaseConfigured) {
+    if (provider !== 'supabase') {
+      throw new Error('Penghapusan akun hanya dapat dilakukan via Supabase Cloud. Keluar lalu masuk kembali.');
+    }
     const { error } = await supabase.rpc('admin_delete_account', {
       p_token: stored.token,
       p_account_id: accountId,

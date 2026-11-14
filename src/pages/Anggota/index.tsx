@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PageHeader } from '../../components/shared/PageHeader';
+import OrgStructureCanvas, { type OrgTreeNodeKey } from '../../components/shared/OrgStructureCanvas';
 import { EmptyState, LoadingState } from '../../components/ui';
 import { AnimatedCounter, ScrollReveal } from '../../components/motion/MotionPrimitives';
 import { useMotionSystem } from '../../components/motion/MotionProvider';
@@ -28,8 +29,6 @@ const UNIT_ORDER: AnggotaUnit[] = [
   'komisi4',
   'komisi5',
 ];
-
-const KOMISI_UNITS = ['komisi1', 'komisi2', 'komisi3', 'komisi4', 'komisi5'] as const;
 
 function getInitials(name: string): string {
   const cleaned = name
@@ -48,9 +47,7 @@ export default function Anggota() {
   const [members, setMembers] = useState<AnggotaOpdim[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedUnit, setSelectedUnit] = useState<'all' | AnggotaUnit>('all');
-  const [focusedTreeNode, setFocusedTreeNode] = useState<
-    'kepala_madrasah' | 'pembina' | 'inti' | 'komisi1' | 'komisi2' | 'komisi3' | 'komisi4' | 'komisi5' | null
-  >(null);
+  const [focusedTreeNode, setFocusedTreeNode] = useState<OrgTreeNodeKey | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMember, setSelectedMember] = useState<AnggotaOpdim | null>(null);
 
@@ -102,19 +99,6 @@ export default function Anggota() {
     return map;
   }, [members]);
 
-  const kepalaMadrasah = useMemo(
-    () => members.find((m) => m.peranLevel === 'kepala_madrasah'),
-    [members]
-  );
-  const pembinaOpdim = useMemo(
-    () => members.find((m) => m.peranLevel === 'pembina'),
-    [members]
-  );
-  const ketuaOpdim = useMemo(
-    () => members.find((m) => m.unit === 'inti' && m.jabatan.toLowerCase().includes('ketua') && !m.jabatan.toLowerCase().includes('wakil')),
-    [members]
-  );
-
   const filteredMembers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return members.filter((member) => {
@@ -147,17 +131,7 @@ export default function Anggota() {
       .filter((group) => group.items.length > 0);
   }, [filteredMembers, selectedUnit]);
 
-  const handleSelectTreeNode = (
-    node:
-      | 'kepala_madrasah'
-      | 'pembina'
-      | 'inti'
-      | 'komisi1'
-      | 'komisi2'
-      | 'komisi3'
-      | 'komisi4'
-      | 'komisi5'
-  ) => {
+  const handleSelectTreeNode = (node: OrgTreeNodeKey) => {
     if (focusedTreeNode === node) {
       setFocusedTreeNode(null);
       setSelectedUnit('all');
@@ -181,7 +155,99 @@ export default function Anggota() {
     selectedUnit !== 'all' ? selectedUnit : null;
 
   return (
-    <div>
+    <div className="anggota-public-page">
+      <style>{`
+        .anggota-kpi-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 1rem;
+          margin-bottom: 1.75rem;
+        }
+        .anggota-unit-tabs {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.45rem;
+        }
+        .anggota-card-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(225px, 1fr));
+          gap: 1.15rem;
+        }
+        .anggota-card-portrait {
+          aspect-ratio: 4 / 3;
+        }
+        .anggota-card-initials {
+          width: 64px;
+          height: 64px;
+          font-size: 1.3rem;
+        }
+        .anggota-card-body {
+          padding: 0.95rem 1rem 1.05rem;
+        }
+        .anggota-card-name {
+          font-size: 0.98rem;
+        }
+        .anggota-card-desc {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+        @media (max-width: 767px) {
+          .anggota-kpi-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.65rem;
+            margin-bottom: 1.25rem;
+          }
+          .anggota-kpi-card {
+            padding: 0.85rem 0.9rem !important;
+          }
+          .anggota-kpi-num {
+            font-size: 1.55rem !important;
+          }
+          .anggota-kpi-sub {
+            display: none;
+          }
+          .anggota-unit-tabs {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding-bottom: 0.15rem;
+          }
+          .anggota-unit-tabs::-webkit-scrollbar {
+            display: none;
+          }
+          .anggota-unit-tab-btn {
+            flex-shrink: 0;
+            white-space: nowrap;
+          }
+          .anggota-card-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.7rem;
+          }
+          .anggota-card-portrait {
+            aspect-ratio: 1 / 1;
+          }
+          .anggota-card-initials {
+            width: 52px;
+            height: 52px;
+            font-size: 1.05rem;
+          }
+          .anggota-card-body {
+            padding: 0.72rem 0.75rem 0.82rem;
+            gap: 0.22rem !important;
+          }
+          .anggota-card-name {
+            font-size: 0.88rem;
+            line-height: 1.25 !important;
+          }
+          .anggota-card-desc {
+            display: none;
+          }
+        }
+      `}</style>
+
       <PageHeader
         title="Struktur & Anggota OPDIM"
         subtitle="Susunan resmi Kepala Madrasah, Pembina, Pengurus Inti, dan 5 Komisi Pelaksana OPDIM VISTARA periode 2026–2027."
@@ -194,18 +260,11 @@ export default function Anggota() {
 
       <section className="section-padding" style={{ background: 'var(--warm-white)' }}>
         <div className="container">
-          {/* ── KPI Strip ── */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
-              gap: '1rem',
-              marginBottom: '2.5rem',
-            }}
-          >
+          {/* ── Compact KPI Strip (2x2 on Mobile, 4 Columns on Desktop) ── */}
+          <div className="anggota-kpi-grid">
             {[
               {
-                label: 'Total Personel Aktif',
+                label: 'Total Personel',
                 value: members.length,
                 detail: 'Terdaftar pada struktur resmi',
                 accent: 'var(--deep-violet)',
@@ -219,7 +278,7 @@ export default function Anggota() {
               {
                 label: 'Pengurus Inti',
                 value: countsByUnit.inti,
-                detail: 'Ketua, Wakil, Sekretaris, Bendahara, Korlap',
+                detail: 'Ketua, Wakil, Sekr, Bend, Korlap',
                 accent: 'var(--royal-purple)',
               },
               {
@@ -229,13 +288,14 @@ export default function Anggota() {
                 accent: 'var(--vistara-purple)',
               },
             ].map((stat, idx) => (
-              <ScrollReveal key={stat.label} preset="fadeUp" delay={idx * 0.05}>
+              <ScrollReveal key={stat.label} preset="fadeUp" delay={idx * 0.04}>
                 <div
+                  className="anggota-kpi-card"
                   style={{
                     background: '#FFFFFF',
                     border: '1px solid var(--pale-lilac)',
                     borderRadius: '14px',
-                    padding: '1.25rem 1.35rem',
+                    padding: '1.15rem 1.25rem',
                     height: '100%',
                     display: 'flex',
                     flexDirection: 'column',
@@ -244,21 +304,22 @@ export default function Anggota() {
                   <div
                     style={{
                       fontFamily: 'var(--font-header)',
-                      fontSize: '0.72rem',
+                      fontSize: '0.7rem',
                       fontWeight: 700,
                       textTransform: 'uppercase',
-                      letterSpacing: '0.08em',
+                      letterSpacing: '0.07em',
                       color: 'var(--mid-grey)',
-                      marginBottom: '0.35rem',
+                      marginBottom: '0.25rem',
                     }}
                   >
                     {stat.label}
                   </div>
                   <div
+                    className="anggota-kpi-num"
                     style={{
                       fontFamily: 'var(--font-display)',
                       fontWeight: 800,
-                      fontSize: '2rem',
+                      fontSize: '1.9rem',
                       lineHeight: 1.1,
                       color: stat.accent,
                       fontVariantNumeric: 'tabular-nums',
@@ -267,10 +328,11 @@ export default function Anggota() {
                     <AnimatedCounter target={stat.value} />
                   </div>
                   <div
+                    className="anggota-kpi-sub"
                     style={{
-                      fontSize: '0.78rem',
+                      fontSize: '0.76rem',
                       color: 'var(--mid-grey)',
-                      marginTop: '0.35rem',
+                      marginTop: '0.3rem',
                     }}
                   >
                     {stat.detail}
@@ -280,14 +342,14 @@ export default function Anggota() {
             ))}
           </div>
 
-          {/* ── Interactive Organizational Structure Diagram ── */}
+          {/* ── Interactive Pinch-to-Zoom & Pan Organizational Diagram ── */}
           <div
             style={{
               background: '#FFFFFF',
               border: '1px solid var(--pale-lilac)',
-              borderRadius: '18px',
-              padding: '1.5rem',
-              marginBottom: '2.5rem',
+              borderRadius: '16px',
+              padding: 'clamp(1rem, 2.5vw, 1.5rem)',
+              marginBottom: '1.5rem',
             }}
           >
             <div
@@ -296,10 +358,10 @@ export default function Anggota() {
                 flexWrap: 'wrap',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                gap: '0.75rem',
-                paddingBottom: '1rem',
+                gap: '0.65rem',
+                paddingBottom: '0.85rem',
                 borderBottom: '1px solid var(--pale-lilac)',
-                marginBottom: '1.5rem',
+                marginBottom: '1rem',
               }}
             >
               <div>
@@ -307,14 +369,14 @@ export default function Anggota() {
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '0.45rem',
+                    gap: '0.4rem',
                     fontFamily: 'var(--font-header)',
-                    fontSize: '0.72rem',
+                    fontSize: '0.7rem',
                     fontWeight: 700,
-                    letterSpacing: '0.1em',
+                    letterSpacing: '0.09em',
                     textTransform: 'uppercase',
                     color: 'var(--vistara-purple)',
-                    marginBottom: '0.25rem',
+                    marginBottom: '0.2rem',
                   }}
                 >
                   <Network size={14} /> Visualisasi Struktur Interaktif
@@ -323,7 +385,7 @@ export default function Anggota() {
                   style={{
                     fontFamily: 'var(--font-display)',
                     fontWeight: 800,
-                    fontSize: '1.35rem',
+                    fontSize: 'clamp(1.1rem, 2.5vw, 1.35rem)',
                     color: 'var(--deep-violet)',
                     margin: 0,
                   }}
@@ -337,324 +399,32 @@ export default function Anggota() {
                   type="button"
                   onClick={resetFilter}
                   className="btn btn-outline btn-sm"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', minHeight: '40px' }}
                 >
-                  <RotateCcw size={14} /> Tampilkan Semua ({members.length})
+                  <RotateCcw size={14} /> Reset ({members.length})
                 </button>
               )}
             </div>
 
-            <p style={{ fontSize: '0.86rem', color: 'var(--mid-grey)', margin: '0 0 1.5rem' }}>
-              Klik salah satu kotak jabatan atau komisi pada bagan di bawah untuk menyaring daftar kartu anggota serta membaca tugas pokok unit terkait.
-            </p>
-
-            {/* Hierarchical Flow Canvas */}
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '0',
-              }}
-            >
-              {/* Tier 1: Kepala Madrasah */}
-              <button
-                type="button"
-                onClick={() => handleSelectTreeNode('kepala_madrasah')}
-                aria-pressed={focusedTreeNode === 'kepala_madrasah'}
-                style={{
-                  width: '100%',
-                  maxWidth: '380px',
-                  textAlign: 'left',
-                  padding: '1rem 1.25rem',
-                  borderRadius: '14px',
-                  border:
-                    focusedTreeNode === 'kepala_madrasah'
-                      ? '2px solid #C9A84C'
-                      : '1px solid rgba(201, 168, 76, 0.45)',
-                  background:
-                    focusedTreeNode === 'kepala_madrasah'
-                      ? 'rgba(201, 168, 76, 0.14)'
-                      : 'rgba(201, 168, 76, 0.06)',
-                  cursor: 'pointer',
-                  transition: 'transform 160ms ease, border-color 160ms ease, background 160ms ease',
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: 'var(--font-header)',
-                    fontSize: '0.68rem',
-                    fontWeight: 700,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: '#8A6812',
-                  }}
-                >
-                  Penanggung Jawab Tertinggi · Pimpinan Lembaga
-                </div>
-                <div
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontWeight: 800,
-                    fontSize: '1.05rem',
-                    color: 'var(--deep-violet)',
-                    marginTop: '0.2rem',
-                  }}
-                >
-                  {kepalaMadrasah?.fullName || 'Hj. Sitti Khasriani, S.S., M.Pd.'}
-                </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--charcoal)', marginTop: '0.15rem' }}>
-                  {kepalaMadrasah?.jabatan || 'Kepala Madrasah'}
-                </div>
-              </button>
-
-              {/* Vertical connector */}
-              <div
-                aria-hidden="true"
-                style={{ width: '2px', height: '24px', background: 'var(--soft-lilac)' }}
-              />
-
-              {/* Tier 2: Pembina OPDIM */}
-              <button
-                type="button"
-                onClick={() => handleSelectTreeNode('pembina')}
-                aria-pressed={focusedTreeNode === 'pembina'}
-                style={{
-                  width: '100%',
-                  maxWidth: '380px',
-                  textAlign: 'left',
-                  padding: '0.95rem 1.25rem',
-                  borderRadius: '14px',
-                  border:
-                    focusedTreeNode === 'pembina'
-                      ? '2px solid var(--royal-purple)'
-                      : '1px solid var(--pale-lilac)',
-                  background:
-                    focusedTreeNode === 'pembina' ? 'var(--ghost-purple)' : '#FFFFFF',
-                  cursor: 'pointer',
-                  transition: 'transform 160ms ease, border-color 160ms ease, background 160ms ease',
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: 'var(--font-header)',
-                    fontSize: '0.68rem',
-                    fontWeight: 700,
-                    letterSpacing: '0.1em',
-                    textTransform: 'uppercase',
-                    color: 'var(--royal-purple)',
-                  }}
-                >
-                  Pembimbing Teknis & Pengarah
-                </div>
-                <div
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontWeight: 800,
-                    fontSize: '1rem',
-                    color: 'var(--deep-violet)',
-                    marginTop: '0.2rem',
-                  }}
-                >
-                  {pembinaOpdim?.fullName || 'Selvianingsih Salilama, S.Pd.'}
-                </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--charcoal)', marginTop: '0.15rem' }}>
-                  {pembinaOpdim?.jabatan || 'Pembina OPDIM'}
-                </div>
-              </button>
-
-              {/* Vertical connector */}
-              <div
-                aria-hidden="true"
-                style={{ width: '2px', height: '24px', background: 'var(--soft-lilac)' }}
-              />
-
-              {/* Tier 3: Pengurus Inti OPDIM */}
-              <button
-                type="button"
-                onClick={() => handleSelectTreeNode('inti')}
-                aria-pressed={focusedTreeNode === 'inti' || (selectedUnit === 'inti' && !focusedTreeNode)}
-                style={{
-                  width: '100%',
-                  maxWidth: '460px',
-                  textAlign: 'left',
-                  padding: '1rem 1.25rem',
-                  borderRadius: '14px',
-                  border:
-                    selectedUnit === 'inti'
-                      ? '2px solid var(--deep-violet)'
-                      : '1px solid rgba(46, 26, 71, 0.25)',
-                  background:
-                    selectedUnit === 'inti'
-                      ? 'linear-gradient(135deg, var(--deep-violet), var(--royal-purple))'
-                      : 'var(--ghost-purple)',
-                  color: selectedUnit === 'inti' ? '#FFFFFF' : 'var(--deep-violet)',
-                  cursor: 'pointer',
-                  transition: 'all 160ms ease',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '0.75rem',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-header)',
-                      fontSize: '0.7rem',
-                      fontWeight: 700,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                      color: selectedUnit === 'inti' ? 'var(--gold-soft)' : 'var(--vistara-purple)',
-                    }}
-                  >
-                    Pengurus Inti OPDIM · {countsByUnit.inti} Personel
-                  </span>
-                </div>
-                <div
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontWeight: 800,
-                    fontSize: '1.05rem',
-                    marginTop: '0.2rem',
-                  }}
-                >
-                  {ketuaOpdim ? `Ketua: ${ketuaOpdim.fullName}` : 'Dewan Harian OPDIM'}
-                </div>
-                <div
-                  style={{
-                    fontSize: '0.78rem',
-                    marginTop: '0.2rem',
-                    color: selectedUnit === 'inti' ? 'rgba(255,255,255,0.84)' : 'var(--mid-grey)',
-                  }}
-                >
-                  Ketua · Wakil Ketua · Sekretaris · Bendahara · Koordinator Lapangan
-                </div>
-              </button>
-
-              {/* Branch connector to 5 Komisi */}
-              <div
-                aria-hidden="true"
-                style={{ width: '2px', height: '22px', background: 'var(--soft-lilac)' }}
-              />
-              <div
-                aria-hidden="true"
-                className="org-branch-bar"
-                style={{
-                  width: '82%',
-                  height: '2px',
-                  background: 'var(--soft-lilac)',
-                  marginBottom: '0.9rem',
-                }}
-              />
-
-              {/* Tier 4: 5 Komisi Cards */}
-              <div
-                style={{
-                  width: '100%',
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))',
-                  gap: '0.85rem',
-                }}
-              >
-                {KOMISI_UNITS.map((unitKey) => {
-                  const meta = ANGGOTA_UNIT_META[unitKey];
-                  const ketua = members.find(
-                    (m) => m.unit === unitKey && m.peranLevel === 'ketua_komisi'
-                  );
-                  const isActive = selectedUnit === unitKey;
-                  return (
-                    <button
-                      key={unitKey}
-                      type="button"
-                      onClick={() => handleSelectTreeNode(unitKey)}
-                      aria-pressed={isActive}
-                      style={{
-                        textAlign: 'left',
-                        padding: '0.95rem 1rem',
-                        borderRadius: '12px',
-                        border: isActive
-                          ? `2px solid ${meta.accentColor}`
-                          : '1px solid var(--pale-lilac)',
-                        background: isActive ? `${meta.accentColor}12` : '#FFFFFF',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.3rem',
-                        minHeight: '108px',
-                        transition: 'all 160ms ease',
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '0.4rem',
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontFamily: 'var(--font-header)',
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.07em',
-                            color: meta.accentColor,
-                          }}
-                        >
-                          {meta.shortLabel}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: '0.72rem',
-                            fontWeight: 700,
-                            color: 'var(--mid-grey)',
-                            fontVariantNumeric: 'tabular-nums',
-                          }}
-                        >
-                          {countsByUnit[unitKey]} org
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: 'var(--font-display)',
-                          fontWeight: 800,
-                          fontSize: '0.88rem',
-                          color: 'var(--deep-violet)',
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        {meta.label.replace(`${meta.shortLabel} — `, '')}
-                      </div>
-                      {ketua && (
-                        <div
-                          style={{
-                            fontSize: '0.75rem',
-                            color: 'var(--mid-grey)',
-                            marginTop: 'auto',
-                            paddingTop: '0.35rem',
-                            borderTop: '1px solid rgba(107,63,160,0.08)',
-                          }}
-                        >
-                          Ketua: <strong style={{ color: 'var(--charcoal)' }}>{ketua.fullName}</strong>
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <OrgStructureCanvas
+              members={members}
+              selectedNode={
+                focusedTreeNode ??
+                (selectedUnit === 'all'
+                  ? null
+                  : selectedUnit === 'pimpinan'
+                    ? 'kepala_madrasah'
+                    : selectedUnit)
+              }
+              onSelectNode={handleSelectTreeNode}
+            />
 
             {/* Active Unit Summary Callout */}
             {activeInspectionUnit && (
               <div
                 style={{
-                  marginTop: '1.35rem',
-                  padding: '1rem 1.15rem',
+                  marginTop: '1rem',
+                  padding: '0.95rem 1.1rem',
                   borderRadius: '12px',
                   background: 'var(--ghost-purple)',
                   border: '1px solid var(--pale-lilac)',
@@ -665,31 +435,38 @@ export default function Anggota() {
                   gap: '0.75rem',
                 }}
               >
-                <div style={{ flex: '1 1 320px' }}>
+                <div style={{ flex: '1 1 260px' }}>
                   <div
                     style={{
                       fontFamily: 'var(--font-header)',
-                      fontSize: '0.72rem',
+                      fontSize: '0.7rem',
                       fontWeight: 700,
                       textTransform: 'uppercase',
                       letterSpacing: '0.08em',
                       color: ANGGOTA_UNIT_META[activeInspectionUnit].accentColor,
                     }}
                   >
-                    Fokus Unit Terpilih · {filteredMembers.length} Personel Ditampilkan
+                    Fokus Unit Terpilih · {filteredMembers.length} Personel
                   </div>
                   <div
                     style={{
                       fontFamily: 'var(--font-display)',
                       fontWeight: 800,
-                      fontSize: '1rem',
+                      fontSize: '0.98rem',
                       color: 'var(--deep-violet)',
                       marginTop: '0.15rem',
                     }}
                   >
                     {ANGGOTA_UNIT_META[activeInspectionUnit].label}
                   </div>
-                  <p style={{ fontSize: '0.83rem', color: 'var(--charcoal)', margin: '0.25rem 0 0', lineHeight: 1.55 }}>
+                  <p
+                    style={{
+                      fontSize: '0.82rem',
+                      color: 'var(--charcoal)',
+                      margin: '0.2rem 0 0',
+                      lineHeight: 1.5,
+                    }}
+                  >
                     {ANGGOTA_UNIT_META[activeInspectionUnit].description}
                   </p>
                 </div>
@@ -699,46 +476,46 @@ export default function Anggota() {
                   className="btn btn-outline btn-sm"
                   style={{ minHeight: '40px' }}
                 >
-                  Lihat Semua Unit
+                  Tampilkan Semua
                 </button>
               </div>
             )}
           </div>
 
-          {/* ── Filter & Search Bar ── */}
+          {/* ── Searchbar & Single-Line Scrollable Unit Filter Bar ── */}
           <div
             style={{
               background: '#FFFFFF',
               border: '1px solid var(--pale-lilac)',
-              borderRadius: '16px',
-              padding: '1.1rem 1.25rem',
-              marginBottom: '2rem',
+              borderRadius: '14px',
+              padding: '0.95rem 1rem',
+              marginBottom: '1.5rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '0.9rem',
+              gap: '0.75rem',
             }}
           >
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
-              <div style={{ position: 'relative', flex: '1 1 260px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.65rem', alignItems: 'center' }}>
+              <div style={{ position: 'relative', flex: '1 1 240px' }}>
                 <Search
                   size={17}
                   style={{
                     position: 'absolute',
-                    left: '0.9rem',
+                    left: '0.85rem',
                     top: '50%',
                     transform: 'translateY(-50%)',
                     color: 'var(--mid-grey)',
                   }}
                 />
                 <input
-                  type="search"
+                  type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari nama pengurus, jabatan, atau bidang komisi..."
+                  placeholder="Cari nama anggota, jabatan, atau komisi..."
                   aria-label="Cari anggota OPDIM"
                   style={{
                     width: '100%',
-                    padding: '0.7rem 1rem 0.7rem 2.5rem',
+                    padding: searchQuery ? '0.6rem 2.6rem 0.6rem 2.45rem' : '0.6rem 0.9rem 0.6rem 2.45rem',
                     borderRadius: '10px',
                     border: '1px solid var(--pale-lilac)',
                     fontSize: '0.9rem',
@@ -747,30 +524,58 @@ export default function Anggota() {
                     minHeight: '44px',
                   }}
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    aria-label="Hapus pencarian"
+                    onClick={() => setSearchQuery('')}
+                    style={{
+                      position: 'absolute',
+                      right: '0.3rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--mid-grey)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <X size={16} />
+                  </button>
+                )}
               </div>
 
               <div
                 style={{
-                  fontSize: '0.82rem',
+                  fontSize: '0.8rem',
                   color: 'var(--mid-grey)',
                   fontFamily: 'var(--font-header)',
                   fontWeight: 600,
                   fontVariantNumeric: 'tabular-nums',
                 }}
               >
-                Menampilkan {filteredMembers.length} dari {members.length} personel
+                {filteredMembers.length} dari {members.length} personel
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+            <div className="anggota-unit-tabs" role="tablist" aria-label="Filter Unit OPDIM">
               <button
                 type="button"
+                role="tab"
+                aria-selected={selectedUnit === 'all' && !focusedTreeNode}
                 onClick={() => {
                   setFocusedTreeNode(null);
                   setSelectedUnit('all');
                 }}
+                className="anggota-unit-tab-btn"
                 style={{
-                  padding: '0.45rem 0.9rem',
+                  padding: '0.45rem 0.85rem',
                   minHeight: '40px',
                   borderRadius: '8px',
                   border:
@@ -795,10 +600,13 @@ export default function Anggota() {
                   <button
                     key={unitKey}
                     type="button"
+                    role="tab"
+                    aria-selected={isActive}
                     onClick={() => {
                       setFocusedTreeNode(null);
                       setSelectedUnit(unitKey);
                     }}
+                    className="anggota-unit-tab-btn"
                     style={{
                       padding: '0.45rem 0.85rem',
                       minHeight: '40px',
@@ -821,7 +629,7 @@ export default function Anggota() {
             </div>
           </div>
 
-          {/* ── Member Photo Cards Directory ── */}
+          {/* ── Member Photo Cards Directory (2-Column Compact on Mobile) ── */}
           {isLoading ? (
             <LoadingState />
           ) : groupedUnits.length === 0 ? (
@@ -831,7 +639,7 @@ export default function Anggota() {
               description="Tidak ada data pengurus yang sesuai dengan filter atau kata kunci pencarian saat ini."
             />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2.75rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               {groupedUnits.map(({ meta, items }) => (
                 <section key={meta.unit} aria-labelledby={`unit-heading-${meta.unit}`}>
                   <div
@@ -840,19 +648,19 @@ export default function Anggota() {
                       flexWrap: 'wrap',
                       alignItems: 'baseline',
                       justifyContent: 'space-between',
-                      gap: '0.5rem',
-                      paddingBottom: '0.75rem',
+                      gap: '0.4rem',
+                      paddingBottom: '0.6rem',
                       borderBottom: '1px solid var(--pale-lilac)',
-                      marginBottom: '1.25rem',
+                      marginBottom: '0.95rem',
                     }}
                   >
                     <div>
                       <div
                         style={{
                           fontFamily: 'var(--font-header)',
-                          fontSize: '0.7rem',
+                          fontSize: '0.68rem',
                           fontWeight: 700,
-                          letterSpacing: '0.1em',
+                          letterSpacing: '0.09em',
                           textTransform: 'uppercase',
                           color: meta.accentColor,
                         }}
@@ -864,9 +672,9 @@ export default function Anggota() {
                         style={{
                           fontFamily: 'var(--font-display)',
                           fontWeight: 800,
-                          fontSize: '1.3rem',
+                          fontSize: 'clamp(1.08rem, 2.5vw, 1.28rem)',
                           color: 'var(--deep-violet)',
-                          margin: '0.2rem 0 0',
+                          margin: '0.15rem 0 0',
                         }}
                       >
                         {meta.label}
@@ -874,13 +682,7 @@ export default function Anggota() {
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(235px, 1fr))',
-                      gap: '1.25rem',
-                    }}
-                  >
+                  <div className="anggota-card-grid">
                     {items.map((member) => (
                       <motion.button
                         key={member.id}
@@ -891,7 +693,7 @@ export default function Anggota() {
                           textAlign: 'left',
                           background: '#FFFFFF',
                           border: '1px solid var(--pale-lilac)',
-                          borderRadius: '14px',
+                          borderRadius: '13px',
                           overflow: 'hidden',
                           cursor: 'pointer',
                           display: 'flex',
@@ -902,10 +704,10 @@ export default function Anggota() {
                       >
                         {/* Portrait Frame */}
                         <div
+                          className="anggota-card-portrait"
                           style={{
                             position: 'relative',
                             width: '100%',
-                            aspectRatio: '4 / 3',
                             background:
                               'linear-gradient(145deg, rgba(107, 63, 160, 0.08) 0%, rgba(201, 168, 76, 0.08) 100%)',
                             borderBottom: '1px solid var(--pale-lilac)',
@@ -937,14 +739,13 @@ export default function Anggota() {
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                gap: '0.45rem',
-                                padding: '1rem',
+                                gap: '0.35rem',
+                                padding: '0.5rem',
                               }}
                             >
                               <div
+                                className="anggota-card-initials"
                                 style={{
-                                  width: '68px',
-                                  height: '68px',
                                   borderRadius: '50%',
                                   background: '#FFFFFF',
                                   border: `1.5px solid ${meta.accentColor}55`,
@@ -953,7 +754,6 @@ export default function Anggota() {
                                   justifyContent: 'center',
                                   fontFamily: 'var(--font-display)',
                                   fontWeight: 800,
-                                  fontSize: '1.35rem',
                                   color: meta.accentColor,
                                   letterSpacing: '0.02em',
                                 }}
@@ -963,13 +763,13 @@ export default function Anggota() {
                               <span
                                 style={{
                                   fontFamily: 'var(--font-header)',
-                                  fontSize: '0.66rem',
-                                  letterSpacing: '0.08em',
+                                  fontSize: '0.62rem',
+                                  letterSpacing: '0.07em',
                                   textTransform: 'uppercase',
                                   color: 'var(--mid-grey)',
                                 }}
                               >
-                                OPDIM VISTARA
+                                VISTARA
                               </span>
                             </div>
                           )}
@@ -977,20 +777,20 @@ export default function Anggota() {
 
                         {/* Card Text Content */}
                         <div
+                          className="anggota-card-body"
                           style={{
-                            padding: '1rem 1.05rem 1.15rem',
                             display: 'flex',
                             flexDirection: 'column',
-                            gap: '0.35rem',
+                            gap: '0.3rem',
                             flex: 1,
                           }}
                         >
                           <div
                             style={{
                               fontFamily: 'var(--font-header)',
-                              fontSize: '0.68rem',
+                              fontSize: '0.64rem',
                               fontWeight: 700,
-                              letterSpacing: '0.07em',
+                              letterSpacing: '0.06em',
                               textTransform: 'uppercase',
                               color: meta.accentColor,
                             }}
@@ -999,11 +799,11 @@ export default function Anggota() {
                           </div>
 
                           <div
+                            className="anggota-card-name"
                             style={{
                               fontFamily: 'var(--font-display)',
                               fontWeight: 800,
-                              fontSize: '1rem',
-                              lineHeight: 1.3,
+                              lineHeight: 1.28,
                               color: 'var(--deep-violet)',
                             }}
                           >
@@ -1012,9 +812,10 @@ export default function Anggota() {
 
                           <div
                             style={{
-                              fontSize: '0.82rem',
+                              fontSize: '0.76rem',
                               fontWeight: 600,
                               color: 'var(--charcoal)',
+                              lineHeight: 1.35,
                             }}
                           >
                             {member.jabatan}
@@ -1022,15 +823,12 @@ export default function Anggota() {
 
                           {member.tugasUtama && (
                             <p
+                              className="anggota-card-desc"
                               style={{
-                                fontSize: '0.78rem',
+                                fontSize: '0.76rem',
                                 color: 'var(--mid-grey)',
-                                lineHeight: 1.5,
-                                margin: '0.25rem 0 0',
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden',
+                                lineHeight: 1.48,
+                                margin: '0.2rem 0 0',
                               }}
                             >
                               {member.tugasUtama}
@@ -1048,16 +846,16 @@ export default function Anggota() {
           {/* Bottom Cross-Link */}
           <div
             style={{
-              marginTop: '3rem',
-              padding: '1.5rem',
-              borderRadius: '16px',
+              marginTop: '2.5rem',
+              padding: '1.25rem 1.35rem',
+              borderRadius: '14px',
               background: 'var(--ghost-purple)',
               border: '1px solid var(--pale-lilac)',
               display: 'flex',
               flexWrap: 'wrap',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '1rem',
+              gap: '0.9rem',
             }}
           >
             <div>
@@ -1065,20 +863,20 @@ export default function Anggota() {
                 style={{
                   fontFamily: 'var(--font-display)',
                   fontWeight: 800,
-                  fontSize: '1.1rem',
+                  fontSize: '1.05rem',
                   color: 'var(--deep-violet)',
                 }}
               >
                 Ingin mengenal program kerja tiap komisi?
               </div>
-              <p style={{ fontSize: '0.86rem', color: 'var(--mid-grey)', margin: '0.25rem 0 0' }}>
+              <p style={{ fontSize: '0.84rem', color: 'var(--mid-grey)', margin: '0.2rem 0 0' }}>
                 Jelajahi daftar lengkap program kerja harian, mingguan, bulanan, hingga tahunan OPDIM VISTARA.
               </p>
             </div>
             <Link
               to="/beranda/program-kerja"
               className="btn btn-primary"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', minHeight: '44px' }}
             >
               Lihat Program Kerja <ArrowRight size={15} />
             </Link>
@@ -1117,7 +915,7 @@ export default function Anggota() {
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: '100%',
-                maxWidth: '520px',
+                maxWidth: '500px',
                 background: '#FFFFFF',
                 borderRadius: '18px',
                 border: '1px solid var(--pale-lilac)',
@@ -1153,8 +951,8 @@ export default function Anggota() {
                 ) : (
                   <div
                     style={{
-                      width: '92px',
-                      height: '92px',
+                      width: '88px',
+                      height: '88px',
                       borderRadius: '50%',
                       background: '#FFFFFF',
                       border: `2px solid ${ANGGOTA_UNIT_META[selectedMember.unit].accentColor}55`,
@@ -1163,7 +961,7 @@ export default function Anggota() {
                       justifyContent: 'center',
                       fontFamily: 'var(--font-display)',
                       fontWeight: 800,
-                      fontSize: '1.9rem',
+                      fontSize: '1.8rem',
                       color: ANGGOTA_UNIT_META[selectedMember.unit].accentColor,
                     }}
                   >
@@ -1179,10 +977,10 @@ export default function Anggota() {
                     position: 'absolute',
                     top: '0.75rem',
                     right: '0.75rem',
-                    width: '40px',
-                    height: '40px',
+                    width: '44px',
+                    height: '44px',
                     borderRadius: '50%',
-                    background: 'rgba(255,255,255,0.92)',
+                    background: 'rgba(255,255,255,0.94)',
                     border: '1px solid var(--pale-lilac)',
                     color: 'var(--deep-violet)',
                     display: 'flex',
@@ -1195,7 +993,7 @@ export default function Anggota() {
                 </button>
               </div>
 
-              <div style={{ padding: '1.4rem 1.5rem 1.6rem' }}>
+              <div style={{ padding: '1.35rem 1.4rem 1.5rem' }}>
                 <div
                   style={{
                     fontFamily: 'var(--font-header)',
@@ -1214,7 +1012,7 @@ export default function Anggota() {
                   style={{
                     fontFamily: 'var(--font-display)',
                     fontWeight: 800,
-                    fontSize: '1.35rem',
+                    fontSize: '1.3rem',
                     color: 'var(--deep-violet)',
                     margin: '0.25rem 0 0',
                   }}
@@ -1226,11 +1024,11 @@ export default function Anggota() {
                   style={{
                     display: 'flex',
                     flexWrap: 'wrap',
-                    gap: '0.9rem',
-                    marginTop: '0.65rem',
-                    paddingBottom: '0.9rem',
+                    gap: '0.8rem',
+                    marginTop: '0.6rem',
+                    paddingBottom: '0.85rem',
                     borderBottom: '1px solid var(--pale-lilac)',
-                    fontSize: '0.84rem',
+                    fontSize: '0.83rem',
                     color: 'var(--charcoal)',
                   }}
                 >
@@ -1244,7 +1042,7 @@ export default function Anggota() {
                   </span>
                 </div>
 
-                <div style={{ marginTop: '0.9rem' }}>
+                <div style={{ marginTop: '0.85rem' }}>
                   <div
                     style={{
                       fontFamily: 'var(--font-header)',
@@ -1258,7 +1056,7 @@ export default function Anggota() {
                   >
                     Tugas Pokok & Amanah
                   </div>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--charcoal)', lineHeight: 1.65, margin: 0 }}>
+                  <p style={{ fontSize: '0.88rem', color: 'var(--charcoal)', lineHeight: 1.65, margin: 0 }}>
                     {selectedMember.tugasUtama ||
                       ANGGOTA_UNIT_META[selectedMember.unit].description}
                   </p>

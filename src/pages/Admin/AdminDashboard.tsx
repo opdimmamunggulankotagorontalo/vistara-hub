@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   MessageSquare,
@@ -83,6 +83,22 @@ export default function AdminDashboard({
   const activeModule = canAccessModule(session.role, selectedModule)
     ? selectedModule
     : getDefaultModuleForRole(session.role);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [mobileMenuOpen]);
 
   const handleSelectModule = (mod: AdminModule) => {
     if (!canAccessModule(session.role, mod)) return;
@@ -175,20 +191,29 @@ export default function AdminDashboard({
           align-items: center;
           justify-content: space-between;
           gap: 0.5rem;
-          padding: 0.6rem 0.9rem;
+          padding: 0.5rem 0.85rem;
           min-height: 56px;
         }
-        .admin-mobile-tabs {
+        .admin-mobile-drawer-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 70;
+          background: rgba(18, 9, 34, 0.52);
+          backdrop-filter: blur(4px);
           display: flex;
-          align-items: center;
-          gap: 0.4rem;
-          overflow-x: auto;
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-          padding: 0 0.9rem 0.65rem;
         }
-        .admin-mobile-tabs::-webkit-scrollbar {
-          display: none;
+        .admin-mobile-drawer-panel {
+          width: min(84vw, 310px);
+          height: 100%;
+          background: #FFFFFF;
+          border-right: 1px solid #E5DDF5;
+          padding: 1rem 0.9rem 1.25rem;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          gap: 0.9rem;
+          overflow-y: auto;
+          box-shadow: 12px 0 36px rgba(15, 8, 34, 0.22);
         }
         .admin-main-column {
           flex: 1;
@@ -242,7 +267,8 @@ export default function AdminDashboard({
             justify-content: space-between;
             gap: 1rem;
           }
-          .admin-mobile-topbar {
+          .admin-mobile-topbar,
+          .admin-mobile-drawer-backdrop {
             display: none;
           }
           .admin-desktop-header {
@@ -417,18 +443,19 @@ export default function AdminDashboard({
         </div>
       </aside>
 
-      {/* Mobile Sticky Top Header + Scrollable Module Tabs */}
+      {/* Mobile Compact Header (Opens Slide-In Left Sidebar Drawer) */}
       <header className="admin-mobile-topbar">
         <div className="admin-mobile-header-row">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0, flex: 1 }}>
             <button
               type="button"
-              aria-label={mobileMenuOpen ? 'Tutup menu divisi' : 'Buka menu divisi'}
+              aria-label={mobileMenuOpen ? 'Tutup sidebar menu' : 'Buka sidebar menu'}
+              aria-expanded={mobileMenuOpen}
               onClick={() => setMobileMenuOpen((v) => !v)}
               style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '9px',
+                width: '44px',
+                height: '44px',
+                borderRadius: '10px',
                 border: '1px solid #E5DDF5',
                 background: '#FAF8FF',
                 color: 'var(--deep-violet)',
@@ -439,14 +466,14 @@ export default function AdminDashboard({
                 cursor: 'pointer',
               }}
             >
-              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
 
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.92rem', color: 'var(--deep-violet)', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {session.fullName}
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.96rem', color: 'var(--deep-violet)', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {ADMIN_MODULE_LABELS[activeModule]}
               </div>
-              <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.72rem', fontWeight: 600, color: 'var(--vistara-purple)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.71rem', fontWeight: 600, color: 'var(--vistara-purple)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {roleMeta.shortLabel} · @{session.username}
               </div>
             </div>
@@ -455,24 +482,21 @@ export default function AdminDashboard({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
             <Link
               to="/beranda"
-              aria-label="Buka Portal Publik"
+              aria-label="Lihat Portal Publik"
               style={{
-                minHeight: '40px',
-                padding: '0 0.6rem',
-                borderRadius: '9px',
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
                 border: '1px solid #E5DDF5',
                 background: 'white',
                 color: 'var(--deep-violet)',
-                fontFamily: 'var(--font-header)',
-                fontSize: '0.75rem',
-                fontWeight: 600,
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.3rem',
+                justifyContent: 'center',
                 textDecoration: 'none',
               }}
             >
-              <ExternalLink size={14} /> Portal
+              <ExternalLink size={16} />
             </Link>
 
             <button
@@ -480,125 +504,210 @@ export default function AdminDashboard({
               onClick={onLogout}
               aria-label="Keluar Sesi Admin"
               style={{
-                minHeight: '40px',
-                padding: '0 0.6rem',
-                borderRadius: '9px',
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
                 border: '1px solid #FFCDD2',
                 background: '#FFF5F5',
                 color: '#C62828',
-                fontFamily: 'var(--font-header)',
-                fontSize: '0.75rem',
-                fontWeight: 600,
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.3rem',
+                justifyContent: 'center',
                 cursor: 'pointer',
               }}
             >
-              <LogOut size={14} /> Keluar
+              <LogOut size={16} />
             </button>
           </div>
         </div>
+      </header>
 
-        {/* Single-thumb horizontal tab switcher */}
-        <nav className="admin-mobile-tabs" aria-label="Tab Modul Admin Mobile">
-          {allowedModules.map((mod) => {
-            const Icon = MODULE_ICONS[mod];
-            const isActive = activeModule === mod;
-            return (
-              <button
-                key={mod}
-                type="button"
-                onClick={() => handleSelectModule(mod)}
-                aria-current={isActive ? 'page' : undefined}
+      {/* Mobile Left Slide-In Sidebar Drawer */}
+      {mobileMenuOpen && (
+        <div
+          className="admin-mobile-drawer-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Sidebar Menu Admin"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setMobileMenuOpen(false);
+          }}
+        >
+          <aside className="admin-mobile-drawer-panel">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <img src="/logo-vistara.svg" alt="VISTARA" width={28} height={28} />
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.96rem', color: 'var(--deep-violet)', lineHeight: 1.1 }}>
+                      VISTARA Admin
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.68rem', color: 'var(--mid-grey)' }}>
+                      OPDIM 2026–2027
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Tutup sidebar menu"
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '9px',
+                    border: '1px solid #E5DDF5',
+                    background: '#FAF8FF',
+                    color: 'var(--deep-violet)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div
                 style={{
-                  minHeight: '40px',
-                  padding: '0.4rem 0.78rem',
-                  borderRadius: '9px',
-                  border: isActive ? '1px solid var(--vistara-purple)' : '1px solid #E5DDF5',
-                  background: isActive ? 'var(--deep-violet)' : '#FAF8FF',
-                  color: isActive ? 'white' : 'var(--deep-violet)',
+                  padding: '0.75rem 0.85rem',
+                  borderRadius: '10px',
+                  background: '#F5F0FC',
+                  border: '1px solid #E5DDF5',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.68rem', fontWeight: 700, fontFamily: 'var(--font-header)', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--vistara-purple)' }}>
+                  <Shield size={12} /> {roleMeta.shortLabel}
+                </div>
+                <div style={{ fontFamily: 'var(--font-header)', fontWeight: 700, fontSize: '0.88rem', color: 'var(--deep-violet)', marginTop: '0.2rem' }}>
+                  {session.fullName}
+                </div>
+                <div style={{ fontSize: '0.74rem', color: 'var(--mid-grey)', marginTop: '0.1rem' }}>
+                  {session.jabatan} · <span style={{ fontFamily: 'var(--font-mono)' }}>@{session.username}</span>
+                </div>
+              </div>
+
+              <nav aria-label="Menu Sidebar Admin Mobile" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                {allowedModules.map((mod) => {
+                  const Icon = MODULE_ICONS[mod];
+                  const isActive = activeModule === mod;
+                  const isAccountsBottom = mod === 'accounts';
+                  return (
+                    <div
+                      key={mod}
+                      style={
+                        isAccountsBottom
+                          ? { marginTop: '0.45rem', paddingTop: '0.5rem', borderTop: '1px solid #EDE6F8' }
+                          : undefined
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSelectModule(mod)}
+                        aria-current={isActive ? 'page' : undefined}
+                        style={{
+                          width: '100%',
+                          minHeight: '44px',
+                          padding: '0.5rem 0.8rem',
+                          borderRadius: '10px',
+                          border: isActive ? '1px solid #D4BFEF' : '1px solid transparent',
+                          background: isActive ? '#F5F0FC' : 'transparent',
+                          color: isActive ? 'var(--deep-violet)' : 'var(--charcoal)',
+                          fontFamily: 'var(--font-header)',
+                          fontWeight: isActive ? 700 : 600,
+                          fontSize: '0.86rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.65rem',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <Icon size={17} style={{ color: isActive ? 'var(--vistara-purple)' : 'var(--mid-grey)', flexShrink: 0 }} />
+                        <span>{ADMIN_MODULE_LABELS[mod]}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </nav>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', paddingTop: '0.85rem', borderTop: '1px solid #EDE6F8' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setShowPasswordModal(true);
+                }}
+                style={{
+                  minHeight: '44px',
+                  padding: '0.45rem 0.8rem',
+                  borderRadius: '10px',
+                  border: '1px solid #E5DDF5',
+                  background: 'white',
+                  color: 'var(--deep-violet)',
                   fontFamily: 'var(--font-header)',
-                  fontWeight: 700,
-                  fontSize: '0.78rem',
-                  display: 'inline-flex',
+                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  display: 'flex',
                   alignItems: 'center',
-                  gap: '0.4rem',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
+                  justifyContent: 'space-between',
                   cursor: 'pointer',
                 }}
               >
-                <Icon size={14} />
-                <span>{ADMIN_MODULE_LABELS[mod]}</span>
+                <span>Ganti Password</span>
+                <KeyRound size={15} style={{ color: 'var(--vistara-purple)' }} />
               </button>
-            );
-          })}
-        </nav>
 
-        {/* Mobile Expandable Drawer */}
-        {mobileMenuOpen && (
-          <div
-            style={{
-              padding: '0.75rem 0.9rem 1rem',
-              borderTop: '1px solid #EDE6F8',
-              background: '#FFFFFF',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.65rem',
-            }}
-          >
-            <div style={{ padding: '0.65rem 0.8rem', borderRadius: '9px', background: '#F5F0FC', fontSize: '0.78rem', color: 'var(--deep-violet)' }}>
-              <strong>{session.fullName}</strong> ({session.jabatan})
-              <div style={{ color: 'var(--mid-grey)', marginTop: '0.15rem', lineHeight: 1.4 }}>{roleMeta.description}</div>
+              <Link
+                to="/beranda"
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  minHeight: '44px',
+                  padding: '0.45rem 0.8rem',
+                  borderRadius: '10px',
+                  border: '1px solid #E5DDF5',
+                  background: '#FAF8FF',
+                  color: 'var(--deep-violet)',
+                  fontFamily: 'var(--font-header)',
+                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  textDecoration: 'none',
+                }}
+              >
+                <span>Lihat Portal Publik</span>
+                <ExternalLink size={15} />
+              </Link>
+
+              <button
+                type="button"
+                onClick={onLogout}
+                style={{
+                  minHeight: '44px',
+                  padding: '0.45rem 0.8rem',
+                  borderRadius: '10px',
+                  border: '1px solid #FFCDD2',
+                  background: '#FFF5F5',
+                  color: '#C62828',
+                  fontFamily: 'var(--font-header)',
+                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.45rem',
+                  cursor: 'pointer',
+                }}
+              >
+                <LogOut size={15} /> Keluar Sesi
+              </button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.45rem' }}>
-              {allowedModules.map((mod) => {
-                const Icon = MODULE_ICONS[mod];
-                const isActive = activeModule === mod;
-                return (
-                  <button
-                    key={mod}
-                    type="button"
-                    onClick={() => handleSelectModule(mod)}
-                    style={{
-                      minHeight: '44px',
-                      padding: '0.5rem 0.7rem',
-                      borderRadius: '9px',
-                      border: isActive ? '1px solid var(--vistara-purple)' : '1px solid #E5DDF5',
-                      background: isActive ? '#F5F0FC' : 'white',
-                      color: 'var(--deep-violet)',
-                      fontFamily: 'var(--font-header)',
-                      fontWeight: 700,
-                      fontSize: '0.8rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.45rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <Icon size={15} style={{ color: 'var(--vistara-purple)', flexShrink: 0 }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {ADMIN_MODULE_LABELS[mod]}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setMobileMenuOpen(false);
-                setShowPasswordModal(true);
-              }}
-              className="btn btn-outline btn-sm"
-              style={{ minHeight: '42px', width: '100%', justifyContent: 'center' }}
-            >
-              <KeyRound size={15} /> Ganti Password Akun Saya
-            </button>
-          </div>
-        )}
-      </header>
+          </aside>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="admin-main-column">
