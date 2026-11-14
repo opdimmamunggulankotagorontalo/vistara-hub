@@ -185,14 +185,43 @@ export interface PollingTopic {
 export type AdminRole = 'root' | 'inti' | 'komisi4' | 'komisi5';
 
 export type AdminModule =
-  | 'accounts'
   | 'events'
   | 'arsip'
   | 'prestasi'
   | 'aspirasi'
   | 'polling'
   | 'berita'
-  | 'galeri';
+  | 'galeri'
+  | 'anggota'
+  | 'accounts';
+
+export type AnggotaUnit =
+  | 'pimpinan'
+  | 'inti'
+  | 'komisi1'
+  | 'komisi2'
+  | 'komisi3'
+  | 'komisi4'
+  | 'komisi5';
+
+export type AnggotaLevel =
+  | 'kepala_madrasah'
+  | 'pembina'
+  | 'inti'
+  | 'ketua_komisi'
+  | 'anggota';
+
+export interface AnggotaOpdim {
+  id: string;
+  fullName: string;
+  jabatan: string;
+  unit: AnggotaUnit;
+  peranLevel: AnggotaLevel;
+  tugasUtama?: string;
+  fotoUrl?: string;
+  sortOrder: number;
+  isActive: boolean;
+}
 
 export interface AdminAccount {
   id: string;

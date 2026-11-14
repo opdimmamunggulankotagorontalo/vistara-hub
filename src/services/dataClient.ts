@@ -3,6 +3,9 @@ import type {
   AdminAccount,
   AdminRole,
   AdminSession,
+  AnggotaLevel,
+  AnggotaOpdim,
+  AnggotaUnit,
   ArsipItem,
   AspirasiRecord,
   BeritaItem,
@@ -11,6 +14,7 @@ import type {
   PollingTopic,
   PrestasiItem,
 } from '../types';
+import { INITIAL_ANGGOTA_OPDIM } from '../data/anggotaSeed';
 import {
   ADMIN_ROLES_META,
   formatBytesReadable,
@@ -26,6 +30,7 @@ const GALLERY_CACHE_KEY = 'vistara_gallery_v2';
 const BERITA_CACHE_KEY = 'vistara_berita_v2';
 const ARSIP_CACHE_KEY = 'vistara_arsip_v2';
 const PRESTASI_CACHE_KEY = 'vistara_prestasi_v1';
+const ANGGOTA_CACHE_KEY = 'vistara_anggota_opdim_v1';
 
 const POLLING_VOTED_KEY = 'vistara_polling_voted_v2';
 const REMINDER_CACHE_KEY = 'vistara_saved_events_v2';
@@ -58,7 +63,8 @@ export type SyncableTable =
   | 'gallery'
   | 'berita'
   | 'arsip'
-  | 'prestasi';
+  | 'prestasi'
+  | 'anggota_opdim';
 
 export interface CreateAspirasiInput {
   jenis: AspirasiRecord['jenis'];
@@ -80,6 +86,7 @@ export interface CreateAdminAccountInput {
 }
 
 export interface UpdateAdminAccountInput {
+  username?: string;
   fullName?: string;
   jabatan?: string;
   role?: AdminRole;
@@ -602,6 +609,7 @@ export async function updateAdminAccount(
     const { data, error } = await supabase.rpc('admin_update_account', {
       p_token: stored.token,
       p_account_id: accountId,
+      p_username: input.username !== undefined ? normalizeUsername(input.username) : null,
       p_full_name: input.fullName !== undefined ? input.fullName.trim() : null,
       p_jabatan: input.jabatan !== undefined ? input.jabatan.trim() : null,
       p_role: input.role ?? null,
@@ -620,7 +628,10 @@ export async function updateAdminAccount(
   const res = await fetch(`/api/admin/accounts/${encodeURIComponent(accountId)}`, {
     method: 'PATCH',
     headers: adminHeaders(stored.token),
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      ...input,
+      username: input.username !== undefined ? normalizeUsername(input.username) : undefined,
+    }),
   });
   const body = (await res.json().catch(() => null)) as { account?: AdminAccount; error?: string } | null;
   if (!res.ok || !body?.account) {
@@ -659,7 +670,7 @@ export async function deleteAdminAccount(accountId: string): Promise<void> {
 
 export async function uploadOptimizedMedia(
   file: File,
-  folder: 'berita' | 'galeri' | 'events' | 'arsip'
+  folder: 'berita' | 'galeri' | 'events' | 'arsip' | 'anggota'
 ): Promise<UploadedMediaResult> {
   const isImage = file.type.startsWith('image/');
   let uploadBlob: Blob = file;
@@ -2220,6 +2231,190 @@ export async function deletePrestasi(id: string): Promise<void> {
   const curr = readCacheArray<PrestasiItem>(PRESTASI_CACHE_KEY);
   writeCacheArray(PRESTASI_CACHE_KEY, curr.filter((p) => p.id !== id));
   broadcastLocalSync('prestasi');
+}
+
+// ─── Anggota OPDIM Operations ──────────────────────────────────
+
+function mapSupabaseAnggotaRow(row: Record<string, unknown>): AnggotaOpdim {
+  return {
+    id: String(row.id),
+    fullName: String(row.full_name ?? row.fullName ?? ''),
+    jabatan: String(row.jabatan ?? ''),
+    unit: String(row.unit ?? 'komisi1') as AnggotaUnit,
+    peranLevel: String(row.peran_level ?? row.peranLevel ?? 'anggota') as AnggotaLevel,
+    tugasUtama: String(row.tugas_utama ?? row.tugasUtama ?? ''),
+    fotoUrl: String(row.foto_url ?? row.fotoUrl ?? ''),
+    sortOrder: Number(row.sort_order ?? row.sortOrder ?? 100),
+    isActive: Boolean(row.is_active ?? row.isActive ?? true),
+  };
+}
+
+export async function fetchAnggotaOpdim(): Promise<AnggotaOpdim[]> {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('anggota_opdim')) {
+    try {
+      const { data, error } = await supabase
+        .from('anggota_opdim')
+        .select('*')
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true });
+
+      if (!error && Array.isArray(data)) {
+        const mapped = (data as Array<Record<string, unknown>>).map(mapSupabaseAnggotaRow);
+        writeCacheArray(ANGGOTA_CACHE_KEY, mapped);
+        return mapped;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  try {
+    const res = await fetch('/api/anggota');
+    if (res.ok) {
+      const data = (await res.json()) as { records?: AnggotaOpdim[] };
+      if (Array.isArray(data.records)) {
+        writeCacheArray(ANGGOTA_CACHE_KEY, data.records);
+        return data.records;
+      }
+    }
+  } catch {
+    // offline fallback
+  }
+
+  const cached = readCacheArray<AnggotaOpdim>(ANGGOTA_CACHE_KEY);
+  return cached.length > 0 ? cached : INITIAL_ANGGOTA_OPDIM;
+}
+
+export async function createAnggotaOpdim(
+  input: Omit<AnggotaOpdim, 'id'>
+): Promise<AnggotaOpdim> {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('anggota_opdim')) {
+    try {
+      const id = `ang-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const { data, error } = await supabase
+        .from('anggota_opdim')
+        .insert({
+          id,
+          full_name: input.fullName,
+          jabatan: input.jabatan,
+          unit: input.unit,
+          peran_level: input.peranLevel,
+          tugas_utama: input.tugasUtama ?? '',
+          foto_url: input.fotoUrl ?? '',
+          sort_order: input.sortOrder,
+          is_active: input.isActive,
+        })
+        .select('*')
+        .single();
+      if (!error && data) {
+        const created = mapSupabaseAnggotaRow(data as Record<string, unknown>);
+        const curr = readCacheArray<AnggotaOpdim>(ANGGOTA_CACHE_KEY);
+        const next = [...curr, created].sort((a, b) => a.sortOrder - b.sortOrder);
+        writeCacheArray(ANGGOTA_CACHE_KEY, next);
+        broadcastLocalSync('anggota_opdim');
+        return created;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch('/api/anggota', {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal menambahkan data anggota OPDIM.');
+  }
+  markLocalFallbackTable('anggota_opdim', true);
+  const data = (await res.json()) as { record: AnggotaOpdim };
+  const curr = readCacheArray<AnggotaOpdim>(ANGGOTA_CACHE_KEY);
+  const next = [...curr, data.record].sort((a, b) => a.sortOrder - b.sortOrder);
+  writeCacheArray(ANGGOTA_CACHE_KEY, next);
+  broadcastLocalSync('anggota_opdim');
+  return data.record;
+}
+
+export async function updateAnggotaOpdim(
+  id: string,
+  input: Omit<AnggotaOpdim, 'id'>
+): Promise<AnggotaOpdim> {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('anggota_opdim')) {
+    try {
+      const { data, error } = await supabase
+        .from('anggota_opdim')
+        .update({
+          full_name: input.fullName,
+          jabatan: input.jabatan,
+          unit: input.unit,
+          peran_level: input.peranLevel,
+          tugas_utama: input.tugasUtama ?? '',
+          foto_url: input.fotoUrl ?? '',
+          sort_order: input.sortOrder,
+          is_active: input.isActive,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select('*')
+        .single();
+      if (!error && data) {
+        const updated = mapSupabaseAnggotaRow(data as Record<string, unknown>);
+        const curr = readCacheArray<AnggotaOpdim>(ANGGOTA_CACHE_KEY);
+        const next = curr
+          .map((a) => (a.id === id ? updated : a))
+          .sort((a, b) => a.sortOrder - b.sortOrder);
+        writeCacheArray(ANGGOTA_CACHE_KEY, next);
+        broadcastLocalSync('anggota_opdim');
+        return updated;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch(`/api/anggota/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal memperbarui data anggota OPDIM.');
+  }
+  const data = (await res.json()) as { record: AnggotaOpdim };
+  const curr = readCacheArray<AnggotaOpdim>(ANGGOTA_CACHE_KEY);
+  const next = curr
+    .map((a) => (a.id === id ? data.record : a))
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+  writeCacheArray(ANGGOTA_CACHE_KEY, next);
+  broadcastLocalSync('anggota_opdim');
+  return data.record;
+}
+
+export async function deleteAnggotaOpdim(id: string): Promise<void> {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('anggota_opdim')) {
+    try {
+      await supabase.from('anggota_opdim').delete().eq('id', id);
+    } catch {
+      // ignore
+    }
+  }
+  try {
+    await fetch(`/api/anggota/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: adminHeaders(),
+    });
+  } catch {
+    // ignore
+  }
+  const curr = readCacheArray<AnggotaOpdim>(ANGGOTA_CACHE_KEY);
+  writeCacheArray(
+    ANGGOTA_CACHE_KEY,
+    curr.filter((a) => a.id !== id)
+  );
+  broadcastLocalSync('anggota_opdim');
 }
 
 // ─── Event Reminders Operations ────────────────────────────────

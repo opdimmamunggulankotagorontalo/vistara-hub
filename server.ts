@@ -4,6 +4,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import express, { type Request, type Response } from 'express';
+import { INITIAL_ANGGOTA_OPDIM } from './src/data/anggotaSeed';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -176,7 +177,47 @@ db.exec(`
     expires_at INTEGER NOT NULL,
     created_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS anggota_opdim (
+    id TEXT PRIMARY KEY,
+    full_name TEXT NOT NULL,
+    jabatan TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    peran_level TEXT NOT NULL,
+    tugas_utama TEXT NOT NULL DEFAULT '',
+    foto_url TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
 `);
+
+// Seed initial Anggota OPDIM from revised Struktur OPDIM VISTARA 2026-2027 if empty
+const anggotaCountRow = db.prepare('SELECT COUNT(*) AS count FROM anggota_opdim').get() as { count: number };
+if (anggotaCountRow.count === 0) {
+  const seedNow = Date.now();
+  const insertAnggotaStmt = db.prepare(`
+    INSERT INTO anggota_opdim (
+      id, full_name, jabatan, unit, peran_level, tugas_utama, foto_url, sort_order, is_active, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const item of INITIAL_ANGGOTA_OPDIM) {
+    insertAnggotaStmt.run(
+      item.id,
+      item.fullName,
+      item.jabatan,
+      item.unit,
+      item.peranLevel,
+      item.tugasUtama || '',
+      item.fotoUrl || '',
+      item.sortOrder,
+      item.isActive ? 1 : 0,
+      seedNow,
+      seedNow
+    );
+  }
+}
 
 // Remove previously seeded dummy rows so the portal starts clean without dummy content
 db.exec(`
@@ -544,8 +585,8 @@ async function startServer() {
       if (!currentPassword || !newPassword) {
         return res.status(400).json({ error: 'Password saat ini dan password baru wajib diisi.' });
       }
-      if (newPassword.length < 8 || newPassword.length > 72) {
-        return res.status(400).json({ error: 'Password baru harus terdiri dari 8 hingga 72 karakter.' });
+      if (newPassword.length < 1 || newPassword.length > 72) {
+        return res.status(400).json({ error: 'Password baru wajib diisi (maksimal 72 karakter).' });
       }
       if (newPassword === currentPassword) {
         return res.status(400).json({ error: 'Password baru tidak boleh sama dengan password lama.' });
@@ -586,9 +627,9 @@ async function startServer() {
     }
   });
 
-  // ── Super Admin Root Account CRUD ───────────────────────────
+  // ── Super Admin Root & Pengurus Inti Account CRUD ───────────
   app.get('/api/admin/accounts', (req, res) => {
-    if (!requireAdminSession(req, res, ['root'])) return;
+    if (!requireAdminSession(req, res, ['root', 'inti'])) return;
     try {
       const rows = db
         .prepare(`
@@ -604,7 +645,8 @@ async function startServer() {
   });
 
   app.post('/api/admin/accounts', (req, res) => {
-    if (!requireAdminSession(req, res, ['root'])) return;
+    const actor = requireAdminSession(req, res, ['root', 'inti']);
+    if (!actor) return;
     try {
       const b = req.body ?? {};
       const username = String(b.username || '').trim().toLowerCase();
@@ -625,8 +667,11 @@ async function startServer() {
       if (!VALID_ADMIN_ROLES.has(role)) {
         return res.status(400).json({ error: 'Divisi / peran akses tidak valid.' });
       }
-      if (password.length < 8 || password.length > 72) {
-        return res.status(400).json({ error: 'Password awal harus terdiri dari 8 hingga 72 karakter.' });
+      if (actor.role !== 'root' && role === 'root') {
+        return res.status(403).json({ error: 'Hanya Super Admin (Root) yang dapat membuat akun Super Admin.' });
+      }
+      if (!password || password.length > 72) {
+        return res.status(400).json({ error: 'Password awal wajib diisi (maksimal 72 karakter).' });
       }
 
       const existing = db
@@ -667,7 +712,7 @@ async function startServer() {
   });
 
   app.patch('/api/admin/accounts/:id', (req, res) => {
-    const actor = requireAdminSession(req, res, ['root']);
+    const actor = requireAdminSession(req, res, ['root', 'inti']);
     if (!actor) return;
     try {
       const targetId = String(req.params.id || '').trim();
@@ -679,7 +724,15 @@ async function startServer() {
         return res.status(404).json({ error: 'Akun pengurus tidak ditemukan.' });
       }
 
+      if (actor.role !== 'root' && target.role === 'root') {
+        return res.status(403).json({
+          error: 'Akun Super Admin (Root) hanya dapat diubah oleh Administrator Root.',
+        });
+      }
+
       const b = req.body ?? {};
+      const nextUsername =
+        b.username !== undefined ? String(b.username).trim().toLowerCase() : target.username;
       const nextFullName = b.fullName !== undefined ? String(b.fullName).trim() : target.full_name;
       const nextJabatan = b.jabatan !== undefined ? String(b.jabatan).trim() : target.jabatan;
       const nextRole =
@@ -694,16 +747,34 @@ async function startServer() {
           ? Boolean(b.mustChangePassword)
           : Boolean(target.must_change_password);
 
+      if (actor.role !== 'root' && nextRole === 'root') {
+        return res.status(403).json({
+          error: 'Pengurus Inti tidak dapat mengubah hak akses menjadi Super Admin (Root).',
+        });
+      }
+      if (!/^[a-z0-9._-]{3,32}$/.test(nextUsername)) {
+        return res.status(400).json({
+          error: 'Username harus 3–32 karakter (huruf kecil, angka, titik, _ atau -).',
+        });
+      }
+      if (nextUsername !== target.username) {
+        const dup = db
+          .prepare('SELECT id FROM admin_accounts WHERE username = ? AND id != ? LIMIT 1')
+          .get(nextUsername, targetId);
+        if (dup) {
+          return res.status(409).json({ error: `Username "${nextUsername}" sudah dipakai akun lain.` });
+        }
+      }
       if (targetId === actor.id && !nextIsActive) {
         return res.status(400).json({
-          error: 'Anda tidak dapat menonaktifkan akun Super Admin yang sedang digunakan.',
+          error: 'Anda tidak dapat menonaktifkan akun yang sedang digunakan.',
         });
       }
       if (!nextFullName || !nextJabatan) {
         return res.status(400).json({ error: 'Nama lengkap dan jabatan tidak boleh kosong.' });
       }
-      if (nextNewPassword && (nextNewPassword.length < 8 || nextNewPassword.length > 72)) {
-        return res.status(400).json({ error: 'Password baru minimal 8 karakter dan maksimal 72 karakter.' });
+      if (nextNewPassword && nextNewPassword.length > 72) {
+        return res.status(400).json({ error: 'Password baru maksimal 72 karakter.' });
       }
 
       const now = Date.now();
@@ -711,9 +782,10 @@ async function startServer() {
 
       db.prepare(`
         UPDATE admin_accounts
-        SET full_name = ?, jabatan = ?, role = ?, is_active = ?, password_hash = ?, must_change_password = ?, updated_at = ?
+        SET username = ?, full_name = ?, jabatan = ?, role = ?, is_active = ?, password_hash = ?, must_change_password = ?, updated_at = ?
         WHERE id = ?
       `).run(
+        nextUsername,
         nextFullName,
         nextJabatan,
         nextRole,
@@ -724,7 +796,7 @@ async function startServer() {
         targetId
       );
 
-      if (!nextIsActive || nextNewPassword) {
+      if (!nextIsActive || (targetId !== actor.id && (nextNewPassword || nextUsername !== target.username))) {
         db.prepare('DELETE FROM admin_sessions WHERE account_id = ?').run(targetId);
       }
 
@@ -740,20 +812,28 @@ async function startServer() {
   });
 
   app.delete('/api/admin/accounts/:id', (req, res) => {
-    const actor = requireAdminSession(req, res, ['root']);
+    const actor = requireAdminSession(req, res, ['root', 'inti']);
     if (!actor) return;
     try {
       const targetId = String(req.params.id || '').trim();
       if (targetId === actor.id) {
         return res.status(400).json({
-          error: 'Anda tidak dapat menghapus akun Super Admin yang sedang aktif digunakan.',
+          error: 'Anda tidak dapat menghapus akun yang sedang aktif digunakan.',
+        });
+      }
+      const target = db
+        .prepare('SELECT role FROM admin_accounts WHERE id = ? LIMIT 1')
+        .get(targetId) as { role: AdminRole } | undefined;
+      if (!target) {
+        return res.status(404).json({ error: 'Akun tidak ditemukan.' });
+      }
+      if (actor.role !== 'root' && target.role === 'root') {
+        return res.status(403).json({
+          error: 'Akun Super Admin (Root) hanya dapat dihapus oleh Administrator Root.',
         });
       }
       db.prepare('DELETE FROM admin_sessions WHERE account_id = ?').run(targetId);
-      const result = db.prepare('DELETE FROM admin_accounts WHERE id = ?').run(targetId);
-      if (result.changes === 0) {
-        return res.status(404).json({ error: 'Akun tidak ditemukan.' });
-      }
+      db.prepare('DELETE FROM admin_accounts WHERE id = ?').run(targetId);
       return res.json({ ok: true });
     } catch (error) {
       console.error('DELETE /api/admin/accounts/:id failed:', error);
@@ -1660,6 +1740,182 @@ async function startServer() {
     } catch (error) {
       console.error('DELETE /api/prestasi/:id failed:', error);
       return res.status(500).json({ error: 'Gagal menghapus data prestasi.' });
+    }
+  });
+
+  // ── Anggota OPDIM REST Endpoints ─────────────────────────────
+  const VALID_ANGGOTA_UNIT = new Set([
+    'pimpinan',
+    'inti',
+    'komisi1',
+    'komisi2',
+    'komisi3',
+    'komisi4',
+    'komisi5',
+  ]);
+  const VALID_ANGGOTA_LEVEL = new Set([
+    'kepala_madrasah',
+    'pembina',
+    'inti',
+    'ketua_komisi',
+    'anggota',
+  ]);
+
+  interface SqliteAnggotaRow {
+    id: string;
+    full_name: string;
+    jabatan: string;
+    unit: string;
+    peran_level: string;
+    tugas_utama: string;
+    foto_url: string;
+    sort_order: number;
+    is_active: number;
+  }
+
+  function mapAnggotaRow(row: SqliteAnggotaRow) {
+    return {
+      id: row.id,
+      fullName: row.full_name,
+      jabatan: row.jabatan,
+      unit: row.unit,
+      peranLevel: row.peran_level,
+      tugasUtama: row.tugas_utama || '',
+      fotoUrl: row.foto_url || '',
+      sortOrder: Number(row.sort_order) || 100,
+      isActive: Boolean(row.is_active),
+    };
+  }
+
+  app.get('/api/anggota', (_req, res) => {
+    try {
+      const rows = db
+        .prepare(
+          'SELECT id, full_name, jabatan, unit, peran_level, tugas_utama, foto_url, sort_order, is_active FROM anggota_opdim ORDER BY sort_order ASC, created_at ASC'
+        )
+        .all() as unknown as SqliteAnggotaRow[];
+      return res.json({ records: rows.map(mapAnggotaRow) });
+    } catch (error) {
+      console.error('GET /api/anggota failed:', error);
+      return res.status(500).json({ error: 'Gagal memuat data anggota OPDIM.' });
+    }
+  });
+
+  app.post('/api/anggota', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi5'])) return;
+    try {
+      const b = req.body ?? {};
+      const fullName = String(b.fullName || '').trim();
+      const jabatan = String(b.jabatan || '').trim();
+      const unit = VALID_ANGGOTA_UNIT.has(String(b.unit)) ? String(b.unit) : 'komisi1';
+      const peranLevel = VALID_ANGGOTA_LEVEL.has(String(b.peranLevel))
+        ? String(b.peranLevel)
+        : 'anggota';
+      const tugasUtama = String(b.tugasUtama || '').trim();
+      const fotoUrl = String(b.fotoUrl || '').trim();
+      const sortOrder = Number.isFinite(Number(b.sortOrder)) ? Number(b.sortOrder) : 50;
+      const isActive = b.isActive !== false;
+
+      if (!fullName || !jabatan) {
+        return res.status(400).json({ error: 'Nama lengkap dan jabatan anggota wajib diisi.' });
+      }
+
+      const id = `ang-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const now = Date.now();
+      db.prepare(`
+        INSERT INTO anggota_opdim (
+          id, full_name, jabatan, unit, peran_level, tugas_utama, foto_url, sort_order, is_active, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        id,
+        fullName,
+        jabatan,
+        unit,
+        peranLevel,
+        tugasUtama,
+        fotoUrl,
+        sortOrder,
+        isActive ? 1 : 0,
+        now,
+        now
+      );
+
+      const created = db
+        .prepare(
+          'SELECT id, full_name, jabatan, unit, peran_level, tugas_utama, foto_url, sort_order, is_active FROM anggota_opdim WHERE id = ?'
+        )
+        .get(id) as SqliteAnggotaRow;
+      return res.status(201).json({ record: mapAnggotaRow(created) });
+    } catch (error) {
+      console.error('POST /api/anggota failed:', error);
+      return res.status(500).json({ error: 'Gagal menambahkan anggota OPDIM.' });
+    }
+  });
+
+  app.put('/api/anggota/:id', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi5'])) return;
+    try {
+      const id = String(req.params.id || '').trim();
+      const existing = db
+        .prepare('SELECT id FROM anggota_opdim WHERE id = ? LIMIT 1')
+        .get(id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Data anggota OPDIM tidak ditemukan.' });
+      }
+
+      const b = req.body ?? {};
+      const fullName = String(b.fullName || '').trim();
+      const jabatan = String(b.jabatan || '').trim();
+      const unit = VALID_ANGGOTA_UNIT.has(String(b.unit)) ? String(b.unit) : 'komisi1';
+      const peranLevel = VALID_ANGGOTA_LEVEL.has(String(b.peranLevel))
+        ? String(b.peranLevel)
+        : 'anggota';
+      const tugasUtama = String(b.tugasUtama || '').trim();
+      const fotoUrl = String(b.fotoUrl || '').trim();
+      const sortOrder = Number.isFinite(Number(b.sortOrder)) ? Number(b.sortOrder) : 50;
+      const isActive = b.isActive !== false;
+
+      if (!fullName || !jabatan) {
+        return res.status(400).json({ error: 'Nama lengkap dan jabatan anggota wajib diisi.' });
+      }
+
+      db.prepare(`
+        UPDATE anggota_opdim
+        SET full_name = ?, jabatan = ?, unit = ?, peran_level = ?, tugas_utama = ?, foto_url = ?, sort_order = ?, is_active = ?, updated_at = ?
+        WHERE id = ?
+      `).run(
+        fullName,
+        jabatan,
+        unit,
+        peranLevel,
+        tugasUtama,
+        fotoUrl,
+        sortOrder,
+        isActive ? 1 : 0,
+        Date.now(),
+        id
+      );
+
+      const updated = db
+        .prepare(
+          'SELECT id, full_name, jabatan, unit, peran_level, tugas_utama, foto_url, sort_order, is_active FROM anggota_opdim WHERE id = ?'
+        )
+        .get(id) as SqliteAnggotaRow;
+      return res.json({ record: mapAnggotaRow(updated) });
+    } catch (error) {
+      console.error('PUT /api/anggota/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal memperbarui data anggota OPDIM.' });
+    }
+  });
+
+  app.delete('/api/anggota/:id', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti', 'komisi5'])) return;
+    try {
+      db.prepare('DELETE FROM anggota_opdim WHERE id = ?').run(String(req.params.id || '').trim());
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error('DELETE /api/anggota/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal menghapus anggota OPDIM.' });
     }
   });
 

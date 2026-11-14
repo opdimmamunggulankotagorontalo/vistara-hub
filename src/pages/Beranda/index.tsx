@@ -369,7 +369,7 @@ export default function BerandaPage() {
             <StatItem target={5} label="Komisi Aktif" delay={0.05} />
             <StatItem target={23} label="Program Kerja Resmi" delay={0.12} />
             <StatItem target={livePrestasi.length} label="Prestasi Tercatat" delay={0.19} />
-            <StatItem target={400} suffix="+" label="Siswa MAM" delay={0.26} />
+            <StatItem target={110} suffix="+" label="Siswa MAM" delay={0.26} />
           </div>
         </div>
 

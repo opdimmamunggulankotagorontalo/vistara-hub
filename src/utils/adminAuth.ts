@@ -14,9 +14,8 @@ export const ADMIN_ROLES_META: Record<AdminRole, AdminRoleMeta> = {
     label: 'Super Admin (Administrator Root)',
     shortLabel: 'Super Admin',
     description:
-      'Kontrol penuh seluruh konten (Event, Arsip, Prestasi, Aspirasi, Polling, Berita, Galeri) dan pembuatan akun pengurus.',
+      'Kontrol penuh seluruh konten, Anggota OPDIM, dan pengelolaan akun admin pengurus.',
     allowedModules: [
-      'accounts',
       'events',
       'arsip',
       'prestasi',
@@ -24,6 +23,8 @@ export const ADMIN_ROLES_META: Record<AdminRole, AdminRoleMeta> = {
       'polling',
       'berita',
       'galeri',
+      'anggota',
+      'accounts',
     ],
   },
   inti: {
@@ -31,7 +32,7 @@ export const ADMIN_ROLES_META: Record<AdminRole, AdminRoleMeta> = {
     label: 'Pengurus Inti OPDIM',
     shortLabel: 'Pengurus Inti',
     description:
-      'Ketua & Sekretaris OPDIM — mengelola Event, Arsip, Prestasi, serta mengawasi Aspirasi, Polling, Berita, dan Galeri.',
+      'Ketua & Sekretaris OPDIM — mengelola konten, data Anggota OPDIM, serta akun pengurus non-root.',
     allowedModules: [
       'events',
       'arsip',
@@ -40,6 +41,8 @@ export const ADMIN_ROLES_META: Record<AdminRole, AdminRoleMeta> = {
       'polling',
       'berita',
       'galeri',
+      'anggota',
+      'accounts',
     ],
   },
   komisi4: {
@@ -53,13 +56,12 @@ export const ADMIN_ROLES_META: Record<AdminRole, AdminRoleMeta> = {
     role: 'komisi5',
     label: 'Komisi 5 — Media & Humas',
     shortLabel: 'Komisi 5',
-    description: 'Mengelola publikasi artikel Berita, album Galeri, dan data Prestasi.',
-    allowedModules: ['berita', 'galeri', 'prestasi'],
+    description: 'Mengelola publikasi artikel Berita, album Galeri, Prestasi, dan Anggota OPDIM.',
+    allowedModules: ['berita', 'galeri', 'prestasi', 'anggota'],
   },
 };
 
 export const ADMIN_MODULE_LABELS: Record<AdminModule, string> = {
-  accounts: 'Kelola Akun',
   events: 'Agenda Event',
   arsip: 'Arsip Dokumen',
   prestasi: 'Prestasi',
@@ -67,6 +69,8 @@ export const ADMIN_MODULE_LABELS: Record<AdminModule, string> = {
   polling: 'Polling Siswa',
   berita: 'Berita',
   galeri: 'Galeri',
+  anggota: 'Anggota OPDIM',
+  accounts: 'Kelola Akun',
 };
 
 export function canAccessModule(role: AdminRole, module: AdminModule): boolean {
@@ -95,9 +99,6 @@ export function validateUsernameFormat(input: string): string | null {
 
 export function validatePasswordStrength(password: string): string | null {
   if (!password) return 'Password wajib diisi.';
-  if (password.length < 8) {
-    return 'Password minimal harus terdiri dari 8 karakter.';
-  }
   if (password.length > 72) {
     return 'Password maksimal 72 karakter.';
   }

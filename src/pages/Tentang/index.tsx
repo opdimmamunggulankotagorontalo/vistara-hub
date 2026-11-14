@@ -649,43 +649,81 @@ export default function TentangPage() {
                 borderRadius: '16px',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-                <span className="badge badge-purple">Pimpinan & Pembina</span>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--deep-violet)' }}>
-                  Pengurus Inti OPDIM VISTARA 2026–2027
-                </h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span className="badge badge-purple">Pimpinan & Pembina</span>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--deep-violet)' }}>
+                    Pimpinan & Pengurus Inti OPDIM VISTARA 2026–2027
+                  </h3>
+                </div>
+                <Link
+                  to="/beranda/anggota"
+                  className="btn btn-outline btn-sm"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  Lihat Struktur & Anggota Lengkap <ArrowRight size={14} />
+                </Link>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 215px), 1fr))', gap: '1rem' }}>
                 {[
                   {
-                    role: 'Ketua Umum OPDIM',
+                    role: 'Kepala Madrasah',
+                    name: pengurusInti.kepalaMadrasah || 'Hj. Sitti Khasriani, S.S., M.Pd.',
+                    desc: 'Penanggung Jawab Tertinggi Lembaga',
+                    color: 'var(--gold-accent)',
+                  },
+                  {
+                    role: 'Pembina OPDIM',
+                    name: pengurusInti.pembina,
+                    desc: 'Pembimbing Teknis & Majelis Pembina',
+                    color: 'var(--gold-accent)',
+                  },
+                  {
+                    role: 'Ketua OPDIM',
                     name: pengurusInti.ketuaUmum,
                     desc: 'Pemimpin Mandat Periode VISTARA',
                     color: 'var(--deep-violet)',
                   },
                   {
-                    role: 'Sekretaris Umum OPDIM',
-                    name: pengurusInti.sekretarisUmum,
-                    desc: 'Administrasi, Persuratan & Super Admin',
+                    role: 'Wakil Ketua OPDIM',
+                    name: 'Khansa Salsabila Azzahra',
+                    desc: 'Koordinator Pelaksanaan 5 Komisi',
                     color: 'var(--royal-purple)',
                   },
                   {
-                    role: 'Pembina OPDIM',
-                    name: pengurusInti.pembina,
-                    desc: 'Pengarah & Majelis Pembina Madrasah',
-                    color: 'var(--gold-accent)',
+                    role: 'Sekretaris OPDIM',
+                    name: pengurusInti.sekretarisUmum,
+                    desc: 'Administrasi, Persuratan & Arsip',
+                    color: 'var(--royal-purple)',
+                  },
+                  {
+                    role: 'Bendahara OPDIM',
+                    name: 'Alifia Salsabila Kasim',
+                    desc: 'Tata Kelola Kas & Keuangan Organisasi',
+                    color: 'var(--vistara-purple)',
+                  },
+                  {
+                    role: 'Koordinator Lapangan',
+                    name: 'Muhammad Akmal Karsimin',
+                    desc: 'Logistik & Komando Teknis Kegiatan',
+                    color: 'var(--vistara-purple)',
                   },
                 ].map((person) => (
                   <motion.div
                     key={person.role}
                     whileHover={reducedMotion ? undefined : { y: -3 }}
-                    style={{ background: 'var(--ghost-purple)', padding: '1rem', borderRadius: '12px', borderLeft: `4px solid ${person.color}` }}
+                    style={{
+                      background: 'var(--ghost-purple)',
+                      padding: '1rem',
+                      borderRadius: '12px',
+                      border: '1px solid var(--pale-lilac)',
+                    }}
                   >
-                    <div style={{ fontSize: '0.72rem', color: 'var(--mid-grey)', fontFamily: 'var(--font-header)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.25rem' }}>
+                    <div style={{ fontSize: '0.72rem', color: person.color, fontFamily: 'var(--font-header)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.25rem' }}>
                       {person.role}
                     </div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.05rem', color: 'var(--deep-violet)' }}>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.02rem', color: 'var(--deep-violet)' }}>
                       {person.name}
                     </div>
                     <div style={{ fontSize: '0.78rem', color: 'var(--charcoal)', marginTop: '0.2rem' }}>

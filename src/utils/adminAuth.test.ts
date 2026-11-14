@@ -11,8 +11,9 @@ import {
 } from './adminAuth';
 import { calculate1080pDimensions } from './imageOptimizer';
 
-test('Super Admin (root) has access to all modules including accounts and prestasi', () => {
+test('Super Admin (root) has access to all modules including accounts at the bottom and anggota', () => {
   assert.equal(canAccessModule('root', 'accounts'), true);
+  assert.equal(canAccessModule('root', 'anggota'), true);
   assert.equal(canAccessModule('root', 'events'), true);
   assert.equal(canAccessModule('root', 'arsip'), true);
   assert.equal(canAccessModule('root', 'prestasi'), true);
@@ -20,11 +21,12 @@ test('Super Admin (root) has access to all modules including accounts and presta
   assert.equal(canAccessModule('root', 'polling'), true);
   assert.equal(canAccessModule('root', 'berita'), true);
   assert.equal(canAccessModule('root', 'galeri'), true);
-  assert.equal(getDefaultModuleForRole('root'), 'accounts');
+  assert.equal(getDefaultModuleForRole('root'), 'events');
 });
 
-test('Pengurus Inti has content access including prestasi but NOT accounts', () => {
-  assert.equal(canAccessModule('inti', 'accounts'), false);
+test('Pengurus Inti has content access, anggota, and non-root accounts at bottom', () => {
+  assert.equal(canAccessModule('inti', 'accounts'), true);
+  assert.equal(canAccessModule('inti', 'anggota'), true);
   assert.equal(canAccessModule('inti', 'events'), true);
   assert.equal(canAccessModule('inti', 'arsip'), true);
   assert.equal(canAccessModule('inti', 'prestasi'), true);
@@ -38,6 +40,7 @@ test('Pengurus Inti has content access including prestasi but NOT accounts', () 
 test('Komisi 4 only has access to aspirasi and polling', () => {
   assert.equal(canAccessModule('komisi4', 'aspirasi'), true);
   assert.equal(canAccessModule('komisi4', 'polling'), true);
+  assert.equal(canAccessModule('komisi4', 'anggota'), false);
   assert.equal(canAccessModule('komisi4', 'prestasi'), false);
   assert.equal(canAccessModule('komisi4', 'berita'), false);
   assert.equal(canAccessModule('komisi4', 'galeri'), false);
@@ -47,10 +50,11 @@ test('Komisi 4 only has access to aspirasi and polling', () => {
   assert.equal(getDefaultModuleForRole('komisi4'), 'aspirasi');
 });
 
-test('Komisi 5 has access to berita, galeri, and prestasi only', () => {
+test('Komisi 5 has access to berita, galeri, prestasi, and anggota', () => {
   assert.equal(canAccessModule('komisi5', 'berita'), true);
   assert.equal(canAccessModule('komisi5', 'galeri'), true);
   assert.equal(canAccessModule('komisi5', 'prestasi'), true);
+  assert.equal(canAccessModule('komisi5', 'anggota'), true);
   assert.equal(canAccessModule('komisi5', 'aspirasi'), false);
   assert.equal(canAccessModule('komisi5', 'polling'), false);
   assert.equal(canAccessModule('komisi5', 'events'), false);
@@ -59,13 +63,14 @@ test('Komisi 5 has access to berita, galeri, and prestasi only', () => {
   assert.equal(getDefaultModuleForRole('komisi5'), 'berita');
 });
 
-test('Username and password validators enforce safe constraints', () => {
+test('Username and flexible password validators enforce safe constraints without minimum length', () => {
   assert.equal(normalizeUsername('  SuperAdmin '), 'superadmin');
   assert.equal(validateUsernameFormat('ketua.opdim'), null);
   assert.notEqual(validateUsernameFormat('ab'), null);
   assert.notEqual(validateUsernameFormat('nama spasi'), null);
   assert.equal(validatePasswordStrength('Vistara#2026'), null);
-  assert.notEqual(validatePasswordStrength('short7'), null);
+  assert.equal(validatePasswordStrength('1234'), null);
+  assert.notEqual(validatePasswordStrength(''), null);
 });
 
 test('calculate1080pDimensions caps 4K landscape and portrait images cleanly without upscaling smaller images', () => {

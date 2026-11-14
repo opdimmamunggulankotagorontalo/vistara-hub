@@ -21,10 +21,10 @@ import type {
 
 // ─── PENGURUS INTI RESMI OPDIM VISTARA ──────────────────────
 export const pengurusInti: PengurusInti = {
-  ketuaUmum: 'M. Aryansyah Thaib',
+  ketuaUmum: 'Muhamad Aryansyah Thaib',
   sekretarisUmum: 'Muhammad Yusuf Lauma',
   pembina: 'Selvianingsih Salilama, S.Pd.',
-  kepalaMadrasah: 'Kepala MAM Unggulan Kota Gorontalo',
+  kepalaMadrasah: 'Hj. Sitti Khasriani, S.S., M.Pd.',
 };
 
 // ─── VISI & MISI RESMI OPDIM ────────────────────────────────
@@ -116,33 +116,54 @@ export const komisiData: KomisiInfo[] = [
   {
     id: 'k1',
     name: 'Komisi 1',
-    fullName: 'Komisi 1 — Keamanan',
+    fullName: 'Komisi 1 — Pengawasan',
     color: '#6B3FA0',
     icon: '🛡️',
-    tagline: 'Disiplin • Ketertiban • Keamanan Madrasah',
-    ketua: 'Alfaruq Djaim',
-    anggota: ['Dava Lelengboto', 'Lutfi Ismail', 'Ziviwilyani', 'Azam Almir'],
-    description: 'Menjaga ketertiban, kedisiplinan kelengkapan atribut seragam, pengamanan kepulangan siswa, dan razia rutin berkala untuk menciptakan lingkungan madrasah yang aman, tertib, dan kondusif.',
+    tagline: 'Pengawasan • Disiplin • Kepatuhan AD/ART',
+    ketua: 'Muhamad Al-Faruq Hi Djaim',
+    anggota: [
+      'Dava Rizky Ramadhan Lelengboto',
+      'Mohamad Luthfi Ismail',
+      'Ziviwilyani',
+      'Muhammad Azzam Almir',
+    ],
+    description:
+      'Mengawasi pelaksanaan program kerja seluruh komisi, memantau kedisiplinan pengurus terhadap AD/ART, dan kepatuhan kegiatan terhadap keputusan rapat paripurna.',
   },
   {
     id: 'k2',
     name: 'Komisi 2',
-    fullName: 'Komisi 2 — Hubungan Eksternal Sekolah',
+    fullName: 'Komisi 2 — Hubungan Eksternal, Diplomasi & Kemitraan',
     color: '#4A2C8A',
     icon: '🤝',
     tagline: 'Diplomasi • Kemitraan • Jejaring • Kolaborasi',
     ketua: 'Muhammad Yusuf Lauma',
-    anggota: ['Naylah Fadhiya Putri Giasi', 'Fakhirah Hikmah Ramadhani Duengo', 'Reyhana Qanitah', 'Sharifa Fukayna Urbi Aswan'],
-    description: 'Unit diplomasi strategis yang proaktif membangun kemitraan antarsekolah, jejaring organisasi siswa, studi komparasi (School Exchange), LDK Kolaboratif, dan aksi kepedulian sosial bersama.',
+    anggota: [
+      'Naylah Fadhiya Putri Giasi',
+      'Fakhirah Hikmah Ramadhani Duengo',
+      'Reyhana Qanitah',
+      'Sharifa Fukayna Urbi Aswan',
+    ],
+    description:
+      'Membangun komunikasi diplomatik dengan organisasi pelajar lain, menjalin relasi kemitraan positif dengan alumni madrasah, dan menginisiasi kerja sama atas izin Kepala Madrasah.',
   },
   {
     id: 'k3',
     name: 'Komisi 3',
-    fullName: 'Komisi 3 — Kedisiplinan Lingkungan & Edukasi Siswa',
+    fullName: 'Komisi 3 — Hubungan Internal Sekolah',
     color: '#845CBC',
     icon: '🌱',
-    tagline: 'Kebersihan • Karakter • Misi Mingguan • Edukasi',
-    description: 'Menggerakkan kepedulian lingkungan melalui Misi Satu Kata per minggu, monitoring piket kelas, pembiasaan membawa sampah pulang sekolah, dan papan informasi edukasi berkala.',
+    tagline: 'Harmoni Kelas • Solidaritas Ekskul • Musyawarah',
+    ketua: 'Moh. Rifhal Saputra',
+    anggota: [
+      'Moh. Ardiansya K. Barata',
+      'Muhammad Alif Alfaridzi Hapiz',
+      'Iedh R. Abas',
+      'Magfirah Hasan',
+      'Anugrah Basri',
+    ],
+    description:
+      'Menjaga koordinasi dan komunikasi harmonis antar-kelas, membangun solidaritas antar-ekstrakurikuler, serta mendukung penyelesaian dinamika santri secara kekeluargaan.',
   },
   {
     id: 'k4',
@@ -151,20 +172,27 @@ export const komisiData: KomisiInfo[] = [
     color: '#9B72CC',
     icon: '💬',
     tagline: 'Terbuka • Transparan • Responsif • Solutif',
-    ketua: 'Nayla Syaqila Husain',
+    ketua: 'Nailah Syaqilah Husain',
     anggota: ['Ain Tahir', 'Aisyah Karimah'],
-    description: 'Wadah resmi penampungan suara siswa melalui kanal daring (Google Form & Instagram) serta kotak aspirasi fisik, mengurasi masukan penting, dan menyampaikan tindak lanjut secara formal.',
+    description:
+      'Menampung kritik dan masukan siswa, mengelola kotak saran daring maupun fisik, serta mengadvokasikan kebutuhan santri secara tertib dan santun.',
   },
   {
     id: 'k5',
     name: 'Komisi 5',
-    fullName: 'Komisi 5 — Humas (Kominfo / Media & Dokumentasi)',
+    fullName: 'Komisi 5 — Humas (Hubungan Masyarakat)',
     color: '#C9A84C',
     icon: '📸',
-    tagline: 'The Voice & Information Channel • Publikasi • Dokumentasi',
+    tagline: 'Publikasi • Dokumentasi Multimedia • Brand VISTARA',
     ketua: "Ihsan Abdussalam Ma'ruf",
-    anggota: ['Tim Liputan & Dokumentasi', 'Tim Desain Grafis & Multimedia'],
-    description: 'Mengelola komunikasi publik, dokumentasi visual setiap agenda (Every Event Documentation), poster apresiasi siswa berprestasi (Student Spotlight), dan peringatan hari besar nasional.',
+    anggota: [
+      'Rafika Devi Sekar Sari',
+      'Rafael Ahmad Baihaqih Djafara',
+      'Sulaiman Nul Ihza D. Hasan',
+      'Razwa Raihana Maabu',
+    ],
+    description:
+      'Mempublikasikan informasi organisasi, melaksanakan dokumentasi multimedia, memelihara brand guide VISTARA, dan mengelola media sosial resmi.',
   },
 ];
 
@@ -780,6 +808,7 @@ export const navItems = [
   { label: 'Program Kerja', href: '/beranda/program-kerja' },
   { label: 'Aspirasi', href: '/beranda/aspirasi' },
   { label: 'Berita', href: '/beranda/berita' },
+  { label: 'Anggota OPDIM', href: '/beranda/anggota' },
   { label: 'Galeri', href: '/beranda/galeri' },
   { label: 'Event', href: '/beranda/event' },
   { label: 'Prestasi', href: '/beranda/prestasi' },

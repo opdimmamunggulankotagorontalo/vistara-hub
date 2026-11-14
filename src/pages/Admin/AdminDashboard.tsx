@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Shield,
+  Users,
 } from 'lucide-react';
 import type { AdminModule, AdminSession } from '../../types';
 import {
@@ -23,6 +24,7 @@ import {
   canAccessModule,
   getDefaultModuleForRole,
 } from '../../utils/adminAuth';
+import { verifyAdminSession } from '../../services/dataClient';
 import AspirasiPanel from './panels/AspirasiPanel';
 import PollingPanel from './panels/PollingPanel';
 import BeritaPanel from './panels/BeritaPanel';
@@ -31,6 +33,7 @@ import EventsPanel from './panels/EventsPanel';
 import ArsipPanel from './panels/ArsipPanel';
 import AccountsPanel from './panels/AccountsPanel';
 import PrestasiPanel from './panels/PrestasiPanel';
+import AnggotaPanel from './panels/AnggotaPanel';
 import ForcePasswordChange from './ForcePasswordChange';
 
 interface AdminDashboardProps {
@@ -40,7 +43,6 @@ interface AdminDashboardProps {
 }
 
 const MODULE_ICONS: Record<AdminModule, typeof MessageSquare> = {
-  accounts: UserCog,
   events: Calendar,
   arsip: FolderArchive,
   prestasi: Trophy,
@@ -48,10 +50,11 @@ const MODULE_ICONS: Record<AdminModule, typeof MessageSquare> = {
   polling: BarChart3,
   berita: Newspaper,
   galeri: ImageIcon,
+  anggota: Users,
+  accounts: UserCog,
 };
 
 const MODULE_DESCRIPTIONS: Record<AdminModule, string> = {
-  accounts: 'Buat akun Ketua/Sekretaris Inti, Komisi 4, dan Komisi 5 serta kelola status keamanan.',
   events: 'Kelola agenda, tanggal, lokasi, dan poster kegiatan resmi OPDIM.',
   arsip: 'Kelola dokumen AD/ART, template proposal, dan LPJ di Pusat Arsip.',
   prestasi: 'Catat dan kelola Hall of Fame prestasi santri & pelajar MAM Unggulan.',
@@ -59,6 +62,8 @@ const MODULE_DESCRIPTIONS: Record<AdminModule, string> = {
   polling: 'Buat topik jajak pendapat siswa, pantau hasil vote, atau tutup polling.',
   berita: 'Terbitkan dan sunting artikel berita serta dokumentasi humas.',
   galeri: 'Kelola album foto kegiatan dengan optimasi otomatis WebP 1080p.',
+  anggota: 'Kelola struktur & foto profil Kepala Madrasah, Pembina, Pengurus Inti, dan 5 Komisi.',
+  accounts: 'Buat & ubah username, password, peran, serta jabatan akun admin pengurus.',
 };
 
 export default function AdminDashboard({
@@ -90,8 +95,6 @@ export default function AdminDashboard({
       return null;
     }
     switch (activeModule) {
-      case 'accounts':
-        return <AccountsPanel currentAccountId={session.accountId} />;
       case 'events':
         return <EventsPanel />;
       case 'arsip':
@@ -106,6 +109,20 @@ export default function AdminDashboard({
         return <BeritaPanel />;
       case 'galeri':
         return <GaleriPanel />;
+      case 'anggota':
+        return <AnggotaPanel />;
+      case 'accounts':
+        return (
+          <AccountsPanel
+            currentAccountId={session.accountId}
+            currentUserRole={session.role}
+            onSelfAccountUpdated={() => {
+              void verifyAdminSession().then((refreshed) => {
+                if (refreshed) onSessionUpdate(refreshed);
+              });
+            }}
+          />
+        );
       default:
         return null;
     }
@@ -288,33 +305,42 @@ export default function AdminDashboard({
             {allowedModules.map((mod) => {
               const Icon = MODULE_ICONS[mod];
               const isActive = activeModule === mod;
+              const isAccountsBottom = mod === 'accounts';
               return (
-                <button
+                <div
                   key={mod}
-                  type="button"
-                  onClick={() => handleSelectModule(mod)}
-                  aria-current={isActive ? 'page' : undefined}
-                  style={{
-                    width: '100%',
-                    minHeight: '42px',
-                    padding: '0.5rem 0.8rem',
-                    borderRadius: '10px',
-                    border: isActive ? '1px solid #D4BFEF' : '1px solid transparent',
-                    background: isActive ? '#F5F0FC' : 'transparent',
-                    color: isActive ? 'var(--deep-violet)' : 'var(--charcoal)',
-                    fontFamily: 'var(--font-header)',
-                    fontWeight: isActive ? 700 : 600,
-                    fontSize: '0.85rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.65rem',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
+                  style={
+                    isAccountsBottom
+                      ? { marginTop: '0.45rem', paddingTop: '0.5rem', borderTop: '1px solid #EDE6F8' }
+                      : undefined
+                  }
                 >
-                  <Icon size={17} style={{ color: isActive ? 'var(--vistara-purple)' : 'var(--mid-grey)', flexShrink: 0 }} />
-                  <span>{ADMIN_MODULE_LABELS[mod]}</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectModule(mod)}
+                    aria-current={isActive ? 'page' : undefined}
+                    style={{
+                      width: '100%',
+                      minHeight: '42px',
+                      padding: '0.5rem 0.8rem',
+                      borderRadius: '10px',
+                      border: isActive ? '1px solid #D4BFEF' : '1px solid transparent',
+                      background: isActive ? '#F5F0FC' : 'transparent',
+                      color: isActive ? 'var(--deep-violet)' : 'var(--charcoal)',
+                      fontFamily: 'var(--font-header)',
+                      fontWeight: isActive ? 700 : 600,
+                      fontSize: '0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.65rem',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <Icon size={17} style={{ color: isActive ? 'var(--vistara-purple)' : 'var(--mid-grey)', flexShrink: 0 }} />
+                    <span>{ADMIN_MODULE_LABELS[mod]}</span>
+                  </button>
+                </div>
               );
             })}
           </nav>

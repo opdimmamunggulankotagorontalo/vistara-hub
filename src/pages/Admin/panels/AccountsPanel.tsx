@@ -13,6 +13,7 @@ import {
   X,
   CheckCircle2,
   Pencil,
+  Lock,
 } from 'lucide-react';
 import type { AdminAccount, AdminRole } from '../../../types';
 import {
@@ -31,9 +32,12 @@ import { EmptyState, LoadingState } from '../../../components/ui';
 
 interface AccountsPanelProps {
   currentAccountId: string;
+  currentUserRole: AdminRole;
+  onSelfAccountUpdated?: () => void;
 }
 
-const ASSIGNABLE_ROLES: AdminRole[] = ['inti', 'komisi4', 'komisi5', 'root'];
+const ROOT_ASSIGNABLE_ROLES: AdminRole[] = ['inti', 'komisi4', 'komisi5', 'root'];
+const INTI_ASSIGNABLE_ROLES: AdminRole[] = ['inti', 'komisi4', 'komisi5'];
 
 function formatTimestamp(ts: number | string | null | undefined): string {
   if (!ts) return 'Belum pernah masuk';
@@ -48,13 +52,20 @@ function formatTimestamp(ts: number | string | null | undefined): string {
   }).format(parsed);
 }
 
-export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) {
+export default function AccountsPanel({
+  currentAccountId,
+  currentUserRole,
+  onSelfAccountUpdated,
+}: AccountsPanelProps) {
+  const isRootActor = currentUserRole === 'root';
+  const assignableRoles = isRootActor ? ROOT_ASSIGNABLE_ROLES : INTI_ASSIGNABLE_ROLES;
+
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showStructureRef, setShowStructureRef] = useState(false);
 
-  // Create form state (strictly free-text)
+  // Create form state (strictly free-text, without password minimum length)
   const [fullName, setFullName] = useState('');
   const [jabatan, setJabatan] = useState('');
   const [role, setRole] = useState<AdminRole>('inti');
@@ -66,15 +77,22 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
   const [formError, setFormError] = useState('');
   const [feedback, setFeedback] = useState('');
 
-  // Inline modals for edit / reset password / delete confirmation
+  // Edit modal state (username, fullName, jabatan, role, optional password)
   const [editingAccount, setEditingAccount] = useState<AdminAccount | null>(null);
+  const [editUsername, setEditUsername] = useState('');
   const [editFullName, setEditFullName] = useState('');
   const [editJabatan, setEditJabatan] = useState('');
   const [editRole, setEditRole] = useState<AdminRole>('inti');
+  const [editNewPassword, setEditNewPassword] = useState('');
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [editForceChange, setEditForceChange] = useState(false);
+
+  // Quick Reset Password modal
   const [resetTarget, setResetTarget] = useState<AdminAccount | null>(null);
   const [resetPasswordVal, setResetPasswordVal] = useState('');
   const [resetForceChange, setResetForceChange] = useState(true);
   const [showResetPassword, setShowResetPassword] = useState(false);
+
   const [modalError, setModalError] = useState('');
   const [isModalSaving, setIsModalSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -152,6 +170,7 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
 
   const handleToggleActive = async (acc: AdminAccount) => {
     if (acc.id === currentAccountId) return;
+    if (!isRootActor && acc.role === 'root') return;
     try {
       const updated = await updateAdminAccount(acc.id, { isActive: !acc.isActive });
       setAccounts((prev) => prev.map((a) => (a.id === acc.id ? updated : a)));
@@ -164,31 +183,56 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
   };
 
   const openEditModal = (acc: AdminAccount) => {
+    if (!isRootActor && acc.role === 'root') return;
     setEditingAccount(acc);
+    setEditUsername(acc.username);
     setEditFullName(acc.fullName);
     setEditJabatan(acc.jabatan);
     setEditRole(acc.role);
+    setEditNewPassword('');
+    setShowEditPassword(false);
+    setEditForceChange(acc.mustChangePassword);
     setModalError('');
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAccount) return;
+
+    const userErr = validateUsernameFormat(editUsername);
+    if (userErr) {
+      setModalError(userErr);
+      return;
+    }
     if (!editFullName.trim() || !editJabatan.trim()) {
       setModalError('Nama lengkap dan jabatan tidak boleh kosong.');
       return;
     }
+    if (editNewPassword) {
+      const pwErr = validatePasswordStrength(editNewPassword);
+      if (pwErr) {
+        setModalError(pwErr);
+        return;
+      }
+    }
+
     setIsModalSaving(true);
     setModalError('');
     try {
       const updated = await updateAdminAccount(editingAccount.id, {
+        username: normalizeUsername(editUsername),
         fullName: editFullName.trim(),
         jabatan: editJabatan.trim(),
         role: editRole,
+        ...(editNewPassword ? { newPassword: editNewPassword } : {}),
+        mustChangePassword: editForceChange,
       });
       setAccounts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+      if (updated.id === currentAccountId) {
+        onSelfAccountUpdated?.();
+      }
       setEditingAccount(null);
-      showSuccess(`Data akun @${updated.username} diperbarui.`);
+      showSuccess(`Akun @${updated.username} berhasil diperbarui.`);
     } catch (err) {
       setModalError(err instanceof Error ? err.message : 'Gagal menyimpan perubahan akun.');
     } finally {
@@ -197,6 +241,7 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
   };
 
   const openResetModal = (acc: AdminAccount) => {
+    if (!isRootActor && acc.role === 'root') return;
     setResetTarget(acc);
     setResetPasswordVal('');
     setResetForceChange(true);
@@ -229,10 +274,11 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
     }
   };
 
-  const handleConfirmDelete = async (id: string) => {
-    if (id === currentAccountId) return;
-    await deleteAdminAccount(id);
-    setAccounts((prev) => prev.filter((a) => a.id !== id));
+  const handleConfirmDelete = async (acc: AdminAccount) => {
+    if (acc.id === currentAccountId) return;
+    if (!isRootActor && acc.role === 'root') return;
+    await deleteAdminAccount(acc.id);
+    setAccounts((prev) => prev.filter((a) => a.id !== acc.id));
     setConfirmDeleteId(null);
     showSuccess('Akun pengurus telah dihapus permanen.');
   };
@@ -280,7 +326,9 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
       {/* Action Toolbar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div style={{ fontSize: '0.84rem', color: 'var(--mid-grey)' }}>
-          Buat & kelola akun login pengurus OPDIM (Ketua/Sekretaris Inti, Komisi 4, Komisi 5).
+          {isRootActor
+            ? 'Buat & ubah akun login pengurus OPDIM (username, password bebas panjang karakter, peran, dan jabatan).'
+            : 'Buat & ubah akun pengurus non-root OPDIM (username, password bebas panjang karakter, peran, dan jabatan).'}
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button
@@ -312,7 +360,7 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
         </div>
       </div>
 
-      {/* Collapsible Official Structure Reference (Read-Only, Manual Input) */}
+      {/* Collapsible Official Structure Reference */}
       {showStructureRef && (
         <div
           className="admin-surface"
@@ -332,14 +380,17 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
               <div style={{ fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.25rem' }}>
                 Pengurus Inti (Ketua & Sekretaris)
               </div>
-              <div>• Ketua OPDIM: Muhammad Aryansyah Thaib</div>
+              <div>• Ketua OPDIM: Muhamad Aryansyah Thaib</div>
+              <div>• Wakil Ketua: Khansa Salsabila Azzahra</div>
               <div>• Sekretaris: Muhammad Yusuf Lauma</div>
+              <div>• Bendahara: Alifia Salsabila Kasim</div>
+              <div>• Korlap: Muhammad Akmal Karsimin</div>
             </div>
             <div style={{ background: 'white', padding: '0.75rem', borderRadius: '9px', border: '1px solid #E5DDF5' }}>
               <div style={{ fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.25rem' }}>
                 Komisi 4 — Aspirasi Siswa
               </div>
-              <div>• Ketua Komisi: Nayla Syaqila Husain</div>
+              <div>• Ketua Komisi: Nailah Syaqilah Husain</div>
               <div>• Anggota: Ain Tahir, Aisyah Karimah</div>
             </div>
             <div style={{ background: 'white', padding: '0.75rem', borderRadius: '9px', border: '1px solid #E5DDF5' }}>
@@ -347,7 +398,7 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
                 Komisi 5 — Media & Humas
               </div>
               <div>• Ketua Komisi: Ihsan Abdussalam Ma&apos;ruf</div>
-              <div>• Anggota: Rafika Devi Sekar Sari, Rafael Ahmad Baihaqih D., Sulaiman Nul Ihza D. Hasan, Razwa Raihana Maabu</div>
+              <div>• Anggota: Rafika Devi Sekar Sari, Rafael Ahmad Baihaqih Djafara, Sulaiman Nul Ihza D. Hasan, Razwa Raihana Maabu</div>
             </div>
           </div>
         </div>
@@ -430,7 +481,7 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
                 onChange={(e) => setRole(e.target.value as AdminRole)}
                 style={{ width: '100%', minHeight: '44px', padding: '0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem', background: 'white' }}
               >
-                {ASSIGNABLE_ROLES.map((r) => (
+                {assignableRoles.map((r) => (
                   <option key={r} value={r}>
                     {ADMIN_ROLES_META[r].label}
                   </option>
@@ -455,14 +506,13 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
 
             <div>
               <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
-                Password Awal (Min. 8 Karakter) *
+                Password Awal *
               </label>
               <div style={{ position: 'relative' }}>
                 <input
                   type={showCreatePassword ? 'text' : 'password'}
                   required
-                  minLength={8}
-                  placeholder="Minimal 8 karakter..."
+                  placeholder="Bebas panjang karakter..."
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   style={{ width: '100%', minHeight: '44px', padding: '0.55rem 2.5rem 0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem' }}
@@ -539,8 +589,10 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
           {accounts.map((acc) => {
             const isSelf = acc.id === currentAccountId;
+            const isProtectedRoot = acc.role === 'root' && !isRootActor;
             const roleInfo = ADMIN_ROLES_META[acc.role];
             const isConfirmingDelete = confirmDeleteId === acc.id;
+
             return (
               <div
                 key={acc.id}
@@ -622,88 +674,107 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.45rem', flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    onClick={() => openEditModal(acc)}
-                    className="btn btn-outline btn-sm"
-                    style={{ minHeight: '40px' }}
-                  >
-                    <Pencil size={14} /> Edit Peran
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => openResetModal(acc)}
-                    className="btn btn-outline btn-sm"
-                    style={{ minHeight: '40px' }}
-                  >
-                    <KeyRound size={14} /> Reset Password
-                  </button>
-
-                  {!isSelf && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {isProtectedRoot ? (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        fontSize: '0.76rem',
+                        color: 'var(--mid-grey)',
+                        fontFamily: 'var(--font-header)',
+                        fontWeight: 600,
+                        padding: '0.3rem 0.5rem',
+                      }}
+                    >
+                      <Lock size={13} /> Dilindungi (Khusus Root)
+                    </span>
+                  ) : (
                     <>
                       <button
                         type="button"
-                        onClick={() => handleToggleActive(acc)}
+                        onClick={() => openEditModal(acc)}
                         className="btn btn-outline btn-sm"
                         style={{ minHeight: '40px' }}
                       >
-                        <Power size={14} /> {acc.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                        <Pencil size={14} /> Edit Akun
                       </button>
 
-                      {isConfirmingDelete ? (
-                        <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => openResetModal(acc)}
+                        className="btn btn-outline btn-sm"
+                        style={{ minHeight: '40px' }}
+                      >
+                        <KeyRound size={14} /> Reset Password
+                      </button>
+
+                      {!isSelf && (
+                        <>
                           <button
                             type="button"
-                            onClick={() => handleConfirmDelete(acc.id)}
-                            style={{
-                              minHeight: '40px',
-                              padding: '0 0.75rem',
-                              borderRadius: '9px',
-                              border: 'none',
-                              background: '#C62828',
-                              color: 'white',
-                              fontFamily: 'var(--font-header)',
-                              fontSize: '0.78rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Ya, Hapus
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteId(null)}
+                            onClick={() => handleToggleActive(acc)}
                             className="btn btn-outline btn-sm"
                             style={{ minHeight: '40px' }}
                           >
-                            Batal
+                            <Power size={14} /> {acc.isActive ? 'Nonaktifkan' : 'Aktifkan'}
                           </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmDeleteId(acc.id)}
-                          aria-label={`Hapus akun @${acc.username}`}
-                          style={{
-                            minHeight: '40px',
-                            padding: '0 0.7rem',
-                            borderRadius: '9px',
-                            border: '1px solid #FFCDD2',
-                            background: '#FFF5F5',
-                            color: '#C62828',
-                            fontFamily: 'var(--font-header)',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.3rem',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <Trash2 size={14} /> Hapus
-                        </button>
+
+                          {isConfirmingDelete ? (
+                            <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleConfirmDelete(acc)}
+                                style={{
+                                  minHeight: '40px',
+                                  padding: '0 0.75rem',
+                                  borderRadius: '9px',
+                                  border: 'none',
+                                  background: '#C62828',
+                                  color: 'white',
+                                  fontFamily: 'var(--font-header)',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Ya, Hapus
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId(null)}
+                                className="btn btn-outline btn-sm"
+                                style={{ minHeight: '40px' }}
+                              >
+                                Batal
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteId(acc.id)}
+                              aria-label={`Hapus akun @${acc.username}`}
+                              style={{
+                                minHeight: '40px',
+                                padding: '0 0.7rem',
+                                borderRadius: '9px',
+                                border: '1px solid #FFCDD2',
+                                background: '#FFF5F5',
+                                color: '#C62828',
+                                fontFamily: 'var(--font-header)',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <Trash2 size={14} /> Hapus
+                            </button>
+                          )}
+                        </>
                       )}
                     </>
                   )}
@@ -714,7 +785,7 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
         </div>
       )}
 
-      {/* Edit Role / Jabatan Modal */}
+      {/* Edit Username / Nama / Jabatan / Peran / Password Modal */}
       {editingAccount && (
         <div
           role="dialog"
@@ -737,7 +808,9 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
           <div
             style={{
               width: '100%',
-              maxWidth: '460px',
+              maxWidth: '480px',
+              maxHeight: '90vh',
+              overflowY: 'auto',
               background: 'white',
               borderRadius: '14px',
               border: '1px solid #E5DDF5',
@@ -750,7 +823,7 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
                   @{editingAccount.username}
                 </div>
                 <h3 style={{ fontSize: '1.08rem', color: 'var(--deep-violet)', margin: 0 }}>
-                  Perbarui Data & Peran Akun
+                  Ubah Data & Kredensial Akun
                 </h3>
               </div>
               <button
@@ -770,6 +843,20 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
             )}
 
             <form onSubmit={handleSaveEdit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
+                  Username Login *
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoCapitalize="none"
+                  value={editUsername}
+                  onChange={(e) => setEditUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+                  style={{ width: '100%', minHeight: '44px', padding: '0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+
               <div>
                 <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
                   Nama Lengkap *
@@ -806,7 +893,7 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
                   onChange={(e) => setEditRole(e.target.value as AdminRole)}
                   style={{ width: '100%', minHeight: '44px', padding: '0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem', background: 'white' }}
                 >
-                  {ASSIGNABLE_ROLES.map((r) => (
+                  {assignableRoles.map((r) => (
                     <option key={r} value={r}>
                       {ADMIN_ROLES_META[r].label}
                     </option>
@@ -814,12 +901,59 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
                 </select>
               </div>
 
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
+                  Password Baru (Opsional — isi jika ingin mengganti)
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showEditPassword ? 'text' : 'password'}
+                    placeholder="Kosongkan jika tidak mengubah password..."
+                    value={editNewPassword}
+                    onChange={(e) => setEditNewPassword(e.target.value)}
+                    style={{ width: '100%', minHeight: '44px', padding: '0.55rem 2.5rem 0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem' }}
+                  />
+                  <button
+                    type="button"
+                    aria-label={showEditPassword ? 'Sembunyikan' : 'Tampilkan'}
+                    onClick={() => setShowEditPassword((v) => !v)}
+                    style={{
+                      position: 'absolute',
+                      right: '0.25rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '36px',
+                      height: '36px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--mid-grey)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {showEditPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: 'var(--charcoal)', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={editForceChange}
+                  onChange={(e) => setEditForceChange(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: 'var(--vistara-purple)' }}
+                />
+                <span>Wajibkan ganti password pada login berikutnya</span>
+              </label>
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.25rem' }}>
                 <button type="button" onClick={() => setEditingAccount(null)} className="btn btn-outline btn-sm" style={{ minHeight: '42px' }}>
                   Batal
                 </button>
                 <button type="submit" disabled={isModalSaving} className="btn btn-primary btn-sm" style={{ minHeight: '42px' }}>
-                  {isModalSaving ? 'Menyimpan...' : 'Simpan'}
+                  {isModalSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
                 </button>
               </div>
             </form>
@@ -827,7 +961,7 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
         </div>
       )}
 
-      {/* Reset Password Modal */}
+      {/* Quick Reset Password Modal */}
       {resetTarget && (
         <div
           role="dialog"
@@ -885,14 +1019,13 @@ export default function AccountsPanel({ currentAccountId }: AccountsPanelProps) 
             <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
-                  Password Sementara Baru (Min. 8 Karakter) *
+                  Password Baru *
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showResetPassword ? 'text' : 'password'}
                     required
-                    minLength={8}
-                    placeholder="Ketik password sementara baru..."
+                    placeholder="Ketik password baru (bebas panjang)..."
                     value={resetPasswordVal}
                     onChange={(e) => setResetPasswordVal(e.target.value)}
                     style={{ width: '100%', minHeight: '44px', padding: '0.55rem 2.5rem 0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem' }}

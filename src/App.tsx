@@ -9,6 +9,7 @@ import Beranda from './pages/Beranda';
 
 // Lazy-loaded feature routes for smaller initial JS bundle
 const Tentang = lazy(() => import('./pages/Tentang'));
+const Anggota = lazy(() => import('./pages/Anggota'));
 const ProgramKerja = lazy(() => import('./pages/ProgramKerja'));
 const ProgramKerjaDetail = lazy(() => import('./pages/ProgramKerja/detail'));
 const Aspirasi = lazy(() => import('./pages/Aspirasi'));
@@ -51,6 +52,7 @@ function PublicLayoutRoutes() {
 
           {/* Core Feature Pages */}
           <Route path="/beranda/tentang" element={<Tentang />} />
+          <Route path="/beranda/anggota" element={<Anggota />} />
 
           {/* Program Kerja + Detail */}
           <Route path="/beranda/program-kerja" element={<ProgramKerja />} />

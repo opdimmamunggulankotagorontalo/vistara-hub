@@ -258,7 +258,7 @@ export default function ForcePasswordChange({
               marginBottom: '0.35rem',
             }}
           >
-            Password Baru (Minimal 8 Karakter) *
+            Password Baru *
           </label>
           <div style={{ position: 'relative' }}>
             <KeyRound
@@ -276,8 +276,7 @@ export default function ForcePasswordChange({
               type={showNew ? 'text' : 'password'}
               autoComplete="new-password"
               required
-              minLength={8}
-              placeholder="Minimal 8 karakter kombinasi huruf & angka..."
+              placeholder="Masukkan password baru..."
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               style={{
@@ -333,7 +332,6 @@ export default function ForcePasswordChange({
             type={showNew ? 'text' : 'password'}
             autoComplete="new-password"
             required
-            minLength={8}
             placeholder="Ketik ulang password baru..."
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
