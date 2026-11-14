@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Award, Search, Filter, ArrowRight } from 'lucide-react';
+import { motion } from 'motion/react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Badge, EmptyState } from '../../components/ui';
 import { prestasiData } from '../../data';
 import type { PrestasiItem } from '../../types';
+import { AnimatedCounter, ScrollReveal, TiltSpotlightCard } from '../../components/motion/MotionPrimitives';
 
 const TINGKAT_OPTIONS = [
   { value: 'all', label: 'Semua Tingkat' },
@@ -90,45 +92,24 @@ export default function Prestasi() {
               marginBottom: '2.5rem',
             }}
           >
-            <div className="glass-card" style={{ padding: '1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>🏆</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2rem', color: 'var(--deep-violet)' }}>
-                {prestasiData.length}
-              </div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--mid-grey)', fontWeight: 500 }}>
-                Total Prestasi Tercatat
-              </div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>🇮🇩</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2rem', color: 'var(--royal-purple)' }}>
-                {countNasional}
-              </div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--mid-grey)', fontWeight: 500 }}>
-                Tingkat Nasional
-              </div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>🏛️</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2rem', color: 'var(--vistara-purple)' }}>
-                {countProvinsi}
-              </div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--mid-grey)', fontWeight: 500 }}>
-                Tingkat Provinsi
-              </div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>📍</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2rem', color: 'var(--gold-accent)' }}>
-                {countKota}
-              </div>
-              <div style={{ fontSize: '0.85rem', color: 'var(--mid-grey)', fontWeight: 500 }}>
-                Tingkat Kota / Kabupaten
-              </div>
-            </div>
+            {[
+              { icon: '🏆', value: prestasiData.length, label: 'Total Prestasi Tercatat', color: 'var(--deep-violet)' },
+              { icon: '🇮🇩', value: countNasional, label: 'Tingkat Nasional', color: 'var(--royal-purple)' },
+              { icon: '🏛️', value: countProvinsi, label: 'Tingkat Provinsi', color: 'var(--vistara-purple)' },
+              { icon: '📍', value: countKota, label: 'Tingkat Kota / Kabupaten', color: 'var(--gold-accent)' },
+            ].map((stat, idx) => (
+              <ScrollReveal key={stat.label} preset="scaleIn" delay={idx * 0.06}>
+                <div className="glass-card" style={{ padding: '1.5rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>{stat.icon}</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2rem', color: stat.color }}>
+                    <AnimatedCounter target={stat.value} />
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--mid-grey)', fontWeight: 500 }}>
+                    {stat.label}
+                  </div>
+                </div>
+              </ScrollReveal>
+            ))}
           </div>
 
           {/* Search & Filter Controls */}
@@ -147,8 +128,7 @@ export default function Prestasi() {
               boxShadow: '0 4px 20px rgba(107, 63, 160, 0.04)',
             }}
           >
-            {/* Search Input */}
-            <div style={{ position: 'relative', flex: '1', minWidth: '260px' }}>
+            <div style={{ position: 'relative', flex: '1', minWidth: '240px' }}>
               <Search
                 size={18}
                 style={{
@@ -177,28 +157,44 @@ export default function Prestasi() {
               />
             </div>
 
-            {/* Tingkat Filter Buttons */}
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
               <Filter size={16} style={{ color: 'var(--mid-grey)', marginRight: '0.25rem' }} />
-              {TINGKAT_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setSelectedTingkat(opt.value)}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    borderRadius: '20px',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    border: 'none',
-                    cursor: 'pointer',
-                    transition: 'all var(--transition-fast)',
-                    background: selectedTingkat === opt.value ? 'var(--deep-violet)' : 'var(--ghost-purple)',
-                    color: selectedTingkat === opt.value ? 'white' : 'var(--slate)',
-                  }}
-                >
-                  {opt.label}
-                </button>
-              ))}
+              {TINGKAT_OPTIONS.map((opt) => {
+                const isActive = selectedTingkat === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setSelectedTingkat(opt.value)}
+                    style={{
+                      position: 'relative',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '20px',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: isActive ? 'transparent' : 'var(--ghost-purple)',
+                      color: isActive ? 'white' : 'var(--slate)',
+                    }}
+                  >
+                    {isActive && (
+                      <motion.span
+                        layoutId="prestasi-tingkat-pill"
+                        transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          borderRadius: '20px',
+                          background: 'var(--deep-violet)',
+                          zIndex: 0,
+                        }}
+                      />
+                    )}
+                    <span style={{ position: 'relative', zIndex: 1 }}>{opt.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -212,122 +208,113 @@ export default function Prestasi() {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
                 gap: '1.5rem',
               }}
             >
-              {filtered.map((item) => {
+              {filtered.map((item, idx) => {
                 const medal = getMedalConfig(item.medali);
                 return (
-                  <div
-                    key={item.id}
-                    className="feature-card"
-                    style={{
-                      background: 'white',
-                      borderRadius: '18px',
-                      border: '1px solid var(--pale-lilac)',
-                      padding: '1.75rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      boxShadow: '0 6px 24px rgba(45, 27, 105, 0.05)',
-                      transition: 'transform var(--transition-base), box-shadow var(--transition-base)',
-                    }}
-                  >
-                    {/* Top row: Medal Badge & Tingkat */}
-                    <div>
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '0.75rem',
-                          marginBottom: '1rem',
-                        }}
-                      >
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.4rem',
-                            padding: '0.35rem 0.85rem',
-                            borderRadius: '100px',
-                            background: medal.bg,
-                            color: medal.color,
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            letterSpacing: '0.02em',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-                          }}
-                        >
-                          <span>{medal.icon}</span>
-                          <span>{medal.label}</span>
-                        </span>
+                  <ScrollReveal key={item.id} preset="fadeUp" delay={Math.min(idx * 0.06, 0.24)}>
+                    <TiltSpotlightCard
+                      cursorLabel="Detail"
+                      spotlightColor="rgba(201, 168, 76, 0.16)"
+                      style={{
+                        borderRadius: '18px',
+                        padding: '1.75rem',
+                        height: '100%',
+                        boxShadow: '0 6px 24px rgba(45, 27, 105, 0.05)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+                        <div>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '0.75rem',
+                              marginBottom: '1rem',
+                            }}
+                          >
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.4rem',
+                                padding: '0.35rem 0.85rem',
+                                borderRadius: '100px',
+                                background: medal.bg,
+                                color: medal.color,
+                                fontSize: '0.78rem',
+                                fontWeight: 700,
+                                letterSpacing: '0.02em',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                              }}
+                            >
+                              <span>{medal.icon}</span>
+                              <span>{medal.label}</span>
+                            </span>
 
-                        <Badge variant="outline">
-                          {item.tingkat.toUpperCase()}
-                        </Badge>
+                            <Badge variant="outline">
+                              {item.tingkat.toUpperCase()}
+                            </Badge>
+                          </div>
+
+                          <h3
+                            style={{
+                              fontFamily: 'var(--font-display)',
+                              fontSize: '1.15rem',
+                              fontWeight: 700,
+                              lineHeight: 1.35,
+                              color: 'var(--deep-violet)',
+                              marginBottom: '0.75rem',
+                            }}
+                          >
+                            {item.title}
+                          </h3>
+
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              fontSize: '0.9rem',
+                              color: 'var(--charcoal)',
+                              fontWeight: 600,
+                              marginBottom: '0.5rem',
+                            }}
+                          >
+                            <Award size={16} style={{ color: 'var(--vistara-purple)', flexShrink: 0 }} />
+                            <span>{item.peraih}</span>
+                          </div>
+
+                          <div style={{ fontSize: '0.8rem', color: 'var(--mid-grey)', lineHeight: 1.5 }}>
+                            <div>Penyelenggara: {item.penyelenggara}</div>
+                            <div>Bidang: <span style={{ color: 'var(--royal-purple)', fontWeight: 500 }}>{item.kategori}</span> ({item.tahun})</div>
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--lavender-mist)' }}>
+                          <Link
+                            to={`/beranda/prestasi/${item.slug}`}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              fontSize: '0.85rem',
+                              fontWeight: 700,
+                              color: 'var(--royal-purple)',
+                              textDecoration: 'none',
+                            }}
+                          >
+                            <span>Lihat Dokumentasi & Detail</span>
+                            <ArrowRight size={15} />
+                          </Link>
+                        </div>
                       </div>
-
-                      {/* Title */}
-                      <h3
-                        style={{
-                          fontFamily: 'var(--font-display)',
-                          fontSize: '1.15rem',
-                          fontWeight: 700,
-                          lineHeight: 1.35,
-                          color: 'var(--deep-violet)',
-                          marginBottom: '0.75rem',
-                        }}
-                      >
-                        {item.title}
-                      </h3>
-
-                      {/* Recipient */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          fontSize: '0.9rem',
-                          color: 'var(--charcoal)',
-                          fontWeight: 600,
-                          marginBottom: '0.5rem',
-                        }}
-                      >
-                        <Award size={16} style={{ color: 'var(--vistara-purple)', flexShrink: 0 }} />
-                        <span>{item.peraih}</span>
-                      </div>
-
-                      {/* Organizer & Category */}
-                      <div style={{ fontSize: '0.8rem', color: 'var(--mid-grey)', lineHeight: 1.5 }}>
-                        <div>Penyelenggara: {item.penyelenggara}</div>
-                        <div>Bidang: <span style={{ color: 'var(--royal-purple)', fontWeight: 500 }}>{item.kategori}</span> ({item.tahun})</div>
-                      </div>
-                    </div>
-
-                    {/* Bottom CTA to Detail */}
-                    <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--lavender-mist)' }}>
-                      <Link
-                        to={`/beranda/prestasi/${item.slug}`}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.5rem',
-                          fontSize: '0.85rem',
-                          fontWeight: 700,
-                          color: 'var(--royal-purple)',
-                          textDecoration: 'none',
-                          transition: 'gap var(--transition-fast)',
-                        }}
-                      >
-                        <span>Lihat Dokumentasi & Detail</span>
-                        <ArrowRight size={15} />
-                      </Link>
-                    </div>
-                  </div>
+                    </TiltSpotlightCard>
+                  </ScrollReveal>
                 );
               })}
             </div>

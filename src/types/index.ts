@@ -163,3 +163,20 @@ export interface PengurusInti {
   pembina: string;
   kepalaMadrasah: string;
 }
+
+export interface PollingOption {
+  id: string;
+  label: string;
+  votes: number;
+}
+
+export interface PollingTopic {
+  id: string;
+  slug: string;
+  question: string;
+  description: string;
+  category: string;
+  status: 'active' | 'closed';
+  closesAt: string;
+  options: PollingOption[];
+}

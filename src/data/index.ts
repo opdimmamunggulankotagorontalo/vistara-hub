@@ -16,6 +16,7 @@ import type {
   ProkerSiklusItem,
   AspirasiRecord,
   PengurusInti,
+  PollingTopic,
 } from '../types';
 
 // ─── PENGURUS INTI RESMI OPDIM VISTARA ──────────────────────
@@ -942,7 +943,7 @@ export const galeriData: GaleriItem[] = [
     description: 'Momen bersejarah pelantikan pengurus OPDIM periode VISTARA di Aula Utama MAM Unggulan.',
     category: 'Seremonial',
     date: '2026-09-15',
-    coverImage: '/maskot-tara.png',
+    coverImage: '/maskot-tara.webp',
     imageCount: 48,
   },
   {
@@ -952,7 +953,7 @@ export const galeriData: GaleriItem[] = [
     description: 'Dokumentasi Raker perdana 5 Komisi VISTARA dalam menyusun program kerja periode 2026–2027.',
     category: 'Organisasi',
     date: '2026-09-22',
-    coverImage: '/maskot-tara.png',
+    coverImage: '/maskot-tara.webp',
     imageCount: 32,
   },
   {
@@ -962,7 +963,7 @@ export const galeriData: GaleriItem[] = [
     description: 'Galeri diskusi sesi perdana bersama narasumber dari kalangan alumni inspiratif.',
     category: 'Kegiatan',
     date: '2026-10-03',
-    coverImage: '/maskot-tara.png',
+    coverImage: '/maskot-tara.webp',
     imageCount: 24,
   },
   {
@@ -972,7 +973,7 @@ export const galeriData: GaleriItem[] = [
     description: 'Dokumentasi penanaman 50 pohon perdana dalam program peduli lingkungan madrasah.',
     category: 'Lingkungan',
     date: '2026-10-02',
-    coverImage: '/maskot-tara.png',
+    coverImage: '/maskot-tara.webp',
     imageCount: 18,
   },
 ];
@@ -1121,6 +1122,39 @@ export const initialAspirasiData: AspirasiRecord[] = [
     riwayatStatus: [
       { status: 'Diterima', waktu: '06 Okt 2026', keterangan: 'Laporan keluhan masuk ke Kotak Aspirasi.' },
       { status: 'Ditinjau', waktu: '07 Okt 2026', keterangan: 'Komisi 4 melakukan verifikasi kendala sinyal di lokasi perpustakaan.' },
+    ],
+  },
+];
+
+// ─── Polling Siswa Resmi (Komisi 4 OPDIM VISTARA) ────────────
+export const initialPollingData: PollingTopic[] = [
+  {
+    id: 'poll-1',
+    slug: 'fokus-agenda-vistara-talks-3',
+    question: 'Tema utama apa yang paling kamu harapkan untuk VISTARA Talks #3?',
+    description: 'Hasil jajak pendapat ini menjadi dasar Komisi 2 & Komisi 4 menentukan topik dan narasumber sesi diskusi berikutnya.',
+    category: 'Kegiatan Siswa',
+    status: 'active',
+    closesAt: '30 November 2026',
+    options: [
+      { id: 'poll-1-opt-1', label: 'Persiapan Olimpiade & Masuk PTN Favorit', votes: 64 },
+      { id: 'poll-1-opt-2', label: 'Kewirausahaan Muda & Ekonomi Kreatif Pelajar', votes: 49 },
+      { id: 'poll-1-opt-3', label: 'Literasi Digital, AI Produktif & Keamanan Siber', votes: 72 },
+      { id: 'poll-1-opt-4', label: 'Kesehatan Mental & Manajemen Waktu Santri-Siswa', votes: 41 },
+    ],
+  },
+  {
+    id: 'poll-2',
+    slug: 'prioritas-fasilitas-madrasah-triwulan-2',
+    question: 'Fasilitas madrasah mana yang perlu diprioritaskan pada audiensi Triwulan II?',
+    description: 'Pilihan siswa akan dirangkum oleh Komisi 4 dalam rekomendasi resmi ke bagian Sarana & Prasarana.',
+    category: 'Fasilitas Madrasah',
+    status: 'active',
+    closesAt: '15 Desember 2026',
+    options: [
+      { id: 'poll-2-opt-1', label: 'Perluasan Area Baca & Stopkontak di Perpustakaan', votes: 83 },
+      { id: 'poll-2-opt-2', label: 'Penambahan Loker Penyimpanan Barang per Kelas', votes: 58 },
+      { id: 'poll-2-opt-3', label: 'Perbaikan Peneduh & Penerangan Area Gazebo', votes: 47 },
     ],
   },
 ];

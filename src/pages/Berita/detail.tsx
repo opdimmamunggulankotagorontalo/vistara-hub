@@ -1,8 +1,13 @@
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, User, Tag } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Badge } from '../../components/ui';
+import ShareButtons from '../../components/ui/ShareButtons';
 import { beritaData } from '../../data';
+import type { BeritaItem } from '../../types';
+import { ScrollReveal, TiltSpotlightCard } from '../../components/motion/MotionPrimitives';
+import { fetchBerita, subscribeToTableChanges } from '../../services/dataClient';
 
 function formatDate(d: string) {
   return new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(d));
@@ -10,8 +15,26 @@ function formatDate(d: string) {
 
 export default function BeritaDetailPage() {
   const { slug } = useParams<{ slug: string }>();
-  const berita = beritaData.find(b => b.slug === slug);
-  const related = beritaData.filter(b => b.slug !== slug).slice(0, 3);
+  const [articles, setArticles] = useState<BeritaItem[]>(beritaData);
+
+  useEffect(() => {
+    let active = true;
+    fetchBerita().then((items) => {
+      if (active) setArticles(items);
+    });
+    const unsubscribe = subscribeToTableChanges('berita', () => {
+      fetchBerita().then((items) => {
+        if (active) setArticles(items);
+      });
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const berita = articles.find((b) => b.slug === slug);
+  const related = articles.filter((b) => b.slug !== slug).slice(0, 3);
 
   if (!berita) {
     return (
@@ -32,10 +55,10 @@ export default function BeritaDetailPage() {
         ]}
       >
         <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'rgba(185,154,225,0.8)', fontSize: '0.8rem', fontFamily: 'var(--font-header)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'rgba(185,154,225,0.85)', fontSize: '0.8rem', fontFamily: 'var(--font-header)' }}>
             <Calendar size={13} />{formatDate(berita.date)}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'rgba(185,154,225,0.8)', fontSize: '0.8rem', fontFamily: 'var(--font-header)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', color: 'rgba(185,154,225,0.85)', fontSize: '0.8rem', fontFamily: 'var(--font-header)' }}>
             <User size={13} />{berita.author}
           </div>
           <Badge variant="ghost">{berita.category}</Badge>
@@ -44,58 +67,90 @@ export default function BeritaDetailPage() {
 
       <section className="section" style={{ background: 'var(--warm-white)' }}>
         <div className="container">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '3rem', alignItems: 'flex-start' }}>
-            <div style={{ maxWidth: '720px' }}>
+          <div className="berita-detail-layout">
+            <div style={{ minWidth: 0 }}>
               <Link to="/beranda/berita" className="btn btn-outline btn-sm" style={{ marginBottom: '2rem', display: 'inline-flex' }}>
                 <ArrowLeft size={14} /> Semua Berita
               </Link>
 
-              {/* Thumbnail */}
-              <div style={{ height: '280px', borderRadius: '16px', background: 'linear-gradient(135deg, var(--deep-violet), var(--vistara-purple))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2rem', overflow: 'hidden' }}>
-                <img src="/logo-vistara.svg" alt="" style={{ height: '72px', opacity: 0.2, filter: 'brightness(0) invert(1)' }} />
-              </div>
+              <ScrollReveal preset="scaleIn">
+                <div style={{ height: '280px', borderRadius: '16px', background: 'linear-gradient(135deg, var(--deep-violet), var(--vistara-purple))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2rem', overflow: 'hidden' }}>
+                  <img src="/logo-vistara.svg" alt="" style={{ height: '72px', opacity: 0.25, filter: 'brightness(0) invert(1)' }} />
+                </div>
+              </ScrollReveal>
 
-              {/* Content */}
-              <div className="card">
-                <p style={{ fontSize: '1.05rem', color: 'var(--charcoal)', lineHeight: 1.8, fontWeight: 500, marginBottom: '1.25rem', fontStyle: 'italic', borderLeft: '3px solid var(--soft-lilac)', paddingLeft: '1rem' }}>
-                  {berita.excerpt}
-                </p>
-                <p style={{ fontSize: '0.95rem', color: 'var(--charcoal)', lineHeight: 1.9, marginBottom: '1rem' }}>
-                  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-                </p>
-                <p style={{ fontSize: '0.95rem', color: 'var(--charcoal)', lineHeight: 1.9, marginBottom: '1rem' }}>
-                  Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
-                </p>
-                <p style={{ fontSize: '0.95rem', color: 'var(--charcoal)', lineHeight: 1.9 }}>
-                  Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.
-                </p>
-              </div>
+              <ScrollReveal preset="fadeUp" delay={0.05}>
+                <div className="card">
+                  <p style={{ fontSize: '1.05rem', color: 'var(--charcoal)', lineHeight: 1.8, fontWeight: 500, marginBottom: '1.25rem', fontStyle: 'italic', borderLeft: '3px solid var(--soft-lilac)', paddingLeft: '1rem' }}>
+                    {berita.excerpt}
+                  </p>
+                  <p style={{ fontSize: '0.95rem', color: 'var(--charcoal)', lineHeight: 1.9, marginBottom: '1rem' }}>
+                    Kegiatan ini merupakan bagian dari komitmen OPDIM VISTARA 2026–2027 dalam memperkuat peran organisasi pelajar sebagai wadah kolaborasi, pembelajaran kepemimpinan, dan pelayanan siswa yang transparan di MAM Unggulan Kota Gorontalo.
+                  </p>
+                  <p style={{ fontSize: '0.95rem', color: 'var(--charcoal)', lineHeight: 1.9, marginBottom: '1rem' }}>
+                    Seluruh rangkaian agenda dilaksanakan melalui koordinasi lintas komisi bersama Majelis Pembina Madrasah agar setiap langkah selaras dengan nilai intelektualitas, akhlak Islami, serta semangat gerakan pelajar Muhammadiyah.
+                  </p>
+                  <p style={{ fontSize: '0.95rem', color: 'var(--charcoal)', lineHeight: 1.9 }}>
+                    Informasi dokumentasi, rekap kegiatan, serta perkembangan tindak lanjut program tersedia di portal VISTARA Hub sebagai bentuk keterbukaan informasi kepada seluruh civitas akademika.
+                  </p>
+                </div>
+              </ScrollReveal>
 
-              {/* Tags */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
                 <Tag size={14} style={{ color: 'var(--mid-grey)' }} />
                 <Badge variant="ghost">{berita.category}</Badge>
                 <Badge variant="outline">OPDIM VISTARA</Badge>
                 <Badge variant="outline">2026</Badge>
               </div>
+
+              <div
+                style={{
+                  marginTop: '1.75rem',
+                  paddingTop: '1.25rem',
+                  borderTop: '1px solid var(--pale-lilac)',
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: 'var(--font-header)',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: 'var(--mid-grey)',
+                    marginBottom: '0.75rem',
+                  }}
+                >
+                  Bagikan Kabar Ini
+                </div>
+                <ShareButtons
+                  title={berita.title}
+                  summary={berita.excerpt}
+                  path={`/beranda/berita/${berita.slug}`}
+                  tag="Berita OPDIM VISTARA"
+                />
+              </div>
             </div>
 
             {/* Sidebar: Related */}
-            <div style={{ width: '260px', flexShrink: 0, display: 'none' }} id="berita-sidebar">
+            <div id="berita-sidebar">
               <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--deep-violet)', marginBottom: '1rem' }}>
                 Berita Lainnya
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {related.map(r => (
-                  <div key={r.id} className="card" style={{ padding: '0.875rem' }}>
-                    <Badge variant="ghost" size="sm">{r.category}</Badge>
-                    <Link
-                      to={`/beranda/berita/${r.slug}`}
-                      style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--deep-violet)', lineHeight: 1.4, marginTop: '0.5rem', textDecoration: 'none', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
-                    >
-                      {r.title}
+                {related.map((r, idx) => (
+                  <ScrollReveal key={r.id} preset="slideRight" delay={idx * 0.06}>
+                    <Link to={`/beranda/berita/${r.slug}`} style={{ textDecoration: 'none', display: 'block' }}>
+                      <TiltSpotlightCard style={{ padding: '0.95rem' }}>
+                        <Badge variant="ghost" size="sm">{r.category}</Badge>
+                        <div
+                          style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--deep-violet)', lineHeight: 1.4, marginTop: '0.5rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                        >
+                          {r.title}
+                        </div>
+                      </TiltSpotlightCard>
                     </Link>
-                  </div>
+                  </ScrollReveal>
                 ))}
               </div>
             </div>
@@ -104,8 +159,17 @@ export default function BeritaDetailPage() {
       </section>
 
       <style>{`
+        .berita-detail-layout {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 2.5rem;
+          align-items: start;
+        }
         @media (min-width: 1024px) {
-          #berita-sidebar { display: block !important; }
+          .berita-detail-layout {
+            grid-template-columns: minmax(0, 1fr) 280px;
+            gap: 3rem;
+          }
         }
       `}</style>
     </div>

@@ -1,88 +1,93 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/layout/Layout';
+import { MotionProvider, useMotionSystem } from './components/motion/MotionProvider';
+import { LoadingState } from './components/ui';
 
-// Pages
+// Eager primary landing route for instant first paint
 import Beranda from './pages/Beranda';
-import Tentang from './pages/Tentang';
-import ProgramKerja from './pages/ProgramKerja';
-import ProgramKerjaDetail from './pages/ProgramKerja/detail';
-import Aspirasi from './pages/Aspirasi';
-import Berita from './pages/Berita';
-import BeritaDetail from './pages/Berita/detail';
-import Galeri from './pages/Galeri';
-import GaleriDetail from './pages/Galeri/detail';
-import Event from './pages/Event';
-import Prestasi from './pages/Prestasi';
-import PrestasiDetail from './pages/Prestasi/detail';
-import Arsip from './pages/Arsip';
-import Kontak from './pages/Kontak';
-import NotFound from './pages/NotFound';
+
+// Lazy-loaded feature routes for smaller initial JS bundle
+const Tentang = lazy(() => import('./pages/Tentang'));
+const ProgramKerja = lazy(() => import('./pages/ProgramKerja'));
+const ProgramKerjaDetail = lazy(() => import('./pages/ProgramKerja/detail'));
+const Aspirasi = lazy(() => import('./pages/Aspirasi'));
+const Berita = lazy(() => import('./pages/Berita'));
+const BeritaDetail = lazy(() => import('./pages/Berita/detail'));
+const Galeri = lazy(() => import('./pages/Galeri'));
+const GaleriDetail = lazy(() => import('./pages/Galeri/detail'));
+const Event = lazy(() => import('./pages/Event'));
+const Prestasi = lazy(() => import('./pages/Prestasi'));
+const PrestasiDetail = lazy(() => import('./pages/Prestasi/detail'));
+const Arsip = lazy(() => import('./pages/Arsip'));
+const Kontak = lazy(() => import('./pages/Kontak'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 /**
- * ScrollToTop ensures scroll position resets to top on every route change
+ * ScrollToTop ensures scroll position resets cleanly on every route change
  */
 function ScrollToTop() {
   const { pathname } = useLocation();
+  const { scrollToTop } = useMotionSystem();
 
   useEffect(() => {
-    window.scrollTo({
-      top: 0,
-      left: 0,
-      behavior: 'instant',
-    });
-  }, [pathname]);
+    scrollToTop(true);
+  }, [pathname, scrollToTop]);
 
   return null;
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <ScrollToTop />
-      <Layout>
-        <Routes>
-          {/* Default redirect to /beranda */}
-          <Route path="/" element={<Navigate to="/beranda" replace />} />
+    <MotionProvider>
+      <BrowserRouter>
+        <ScrollToTop />
+        <Layout>
+          <Suspense fallback={<LoadingState />}>
+            <Routes>
+              {/* Default redirect to /beranda */}
+              <Route path="/" element={<Navigate to="/beranda" replace />} />
 
-          {/* Primary Route: Beranda (Homepage / Public Dashboard) */}
-          <Route path="/beranda" element={<Beranda />} />
+              {/* Primary Route: Beranda (Homepage / Public Dashboard) */}
+              <Route path="/beranda" element={<Beranda />} />
 
-          {/* Core Feature Pages */}
-          <Route path="/beranda/tentang" element={<Tentang />} />
+              {/* Core Feature Pages */}
+              <Route path="/beranda/tentang" element={<Tentang />} />
 
-          {/* Program Kerja + Detail */}
-          <Route path="/beranda/program-kerja" element={<ProgramKerja />} />
-          <Route path="/beranda/program-kerja/:slug" element={<ProgramKerjaDetail />} />
+              {/* Program Kerja + Detail */}
+              <Route path="/beranda/program-kerja" element={<ProgramKerja />} />
+              <Route path="/beranda/program-kerja/:slug" element={<ProgramKerjaDetail />} />
 
-          {/* Suara Aspirasi */}
-          <Route path="/beranda/aspirasi" element={<Aspirasi />} />
+              {/* Suara Aspirasi */}
+              <Route path="/beranda/aspirasi" element={<Aspirasi />} />
 
-          {/* Berita + Detail */}
-          <Route path="/beranda/berita" element={<Berita />} />
-          <Route path="/beranda/berita/:slug" element={<BeritaDetail />} />
+              {/* Berita + Detail */}
+              <Route path="/beranda/berita" element={<Berita />} />
+              <Route path="/beranda/berita/:slug" element={<BeritaDetail />} />
 
-          {/* Galeri + Detail */}
-          <Route path="/beranda/galeri" element={<Galeri />} />
-          <Route path="/beranda/galeri/:slug" element={<GaleriDetail />} />
+              {/* Galeri + Detail */}
+              <Route path="/beranda/galeri" element={<Galeri />} />
+              <Route path="/beranda/galeri/:slug" element={<GaleriDetail />} />
 
-          {/* Agenda Event */}
-          <Route path="/beranda/event" element={<Event />} />
+              {/* Agenda Event */}
+              <Route path="/beranda/event" element={<Event />} />
 
-          {/* Hall of Fame Prestasi + Detail */}
-          <Route path="/beranda/prestasi" element={<Prestasi />} />
-          <Route path="/beranda/prestasi/:slug" element={<PrestasiDetail />} />
+              {/* Hall of Fame Prestasi + Detail */}
+              <Route path="/beranda/prestasi" element={<Prestasi />} />
+              <Route path="/beranda/prestasi/:slug" element={<PrestasiDetail />} />
 
-          {/* Pusat Arsip & Dokumen */}
-          <Route path="/beranda/arsip" element={<Arsip />} />
+              {/* Pusat Arsip & Dokumen */}
+              <Route path="/beranda/arsip" element={<Arsip />} />
 
-          {/* Kontak & Sekretariat */}
-          <Route path="/beranda/kontak" element={<Kontak />} />
+              {/* Kontak & Sekretariat */}
+              <Route path="/beranda/kontak" element={<Kontak />} />
 
-          {/* 404 Fallback Route */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Layout>
-    </BrowserRouter>
+              {/* 404 Fallback Route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </Layout>
+      </BrowserRouter>
+    </MotionProvider>
   );
 }

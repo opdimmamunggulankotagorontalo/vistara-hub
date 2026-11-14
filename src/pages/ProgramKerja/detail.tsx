@@ -6,6 +6,7 @@ import {
 import { PageHeader } from '../../components/shared/PageHeader';
 import { StatusBadge } from '../../components/ui';
 import { programKerjaData } from '../../data';
+import { ScrollReveal, TiltSpotlightCard } from '../../components/motion/MotionPrimitives';
 
 export default function ProgramKerjaDetailPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -23,7 +24,6 @@ export default function ProgramKerjaDetailPage() {
     );
   }
 
-  // Related programs
   const relatedProkers = programKerjaData
     .filter((p) => p.slug !== proker.slug && (p.komisi === proker.komisi || p.kategoriProker === proker.kategoriProker))
     .slice(0, 3);
@@ -39,7 +39,7 @@ export default function ProgramKerjaDetailPage() {
         ]}
       >
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span className="badge" style={{ background: `${proker.komisiColor}25`, color: proker.komisiColor, border: `1px solid ${proker.komisiColor}40`, fontWeight: 700 }}>
+          <span className="badge" style={{ background: `${proker.komisiColor}25`, color: '#EDE6F8', border: `1px solid ${proker.komisiColor}70`, fontWeight: 700 }}>
             {proker.komisi}
           </span>
           {proker.frekuensi && (
@@ -59,126 +59,144 @@ export default function ProgramKerjaDetailPage() {
             </Link>
 
             {/* ── CARD RINGKASAN & DESKRIPSI ── */}
-            <div className="card" style={{ marginBottom: '1.75rem', borderLeft: `5px solid ${proker.komisiColor}` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                <FileText size={18} style={{ color: proker.komisiColor }} />
-                <h2 style={{ fontSize: '1.25rem', color: 'var(--deep-violet)', margin: 0 }}>Deskripsi & Gambaran Program</h2>
+            <ScrollReveal preset="fadeUp">
+              <div className="card" style={{ marginBottom: '1.75rem', borderLeft: `5px solid ${proker.komisiColor}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                  <FileText size={18} style={{ color: proker.komisiColor }} />
+                  <h2 style={{ fontSize: '1.25rem', color: 'var(--deep-violet)', margin: 0 }}>Deskripsi & Gambaran Program</h2>
+                </div>
+                <p style={{ color: 'var(--charcoal)', lineHeight: 1.8, fontSize: '0.95rem' }}>
+                  {proker.description}
+                </p>
               </div>
-              <p style={{ color: 'var(--charcoal)', lineHeight: 1.8, fontSize: '0.95rem' }}>
-                {proker.description}
-              </p>
-            </div>
+            </ScrollReveal>
 
             {/* ── TUJUAN & FUNGSI ── */}
             {(proker.tujuan || proker.fungsi) && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginBottom: '1.75rem' }}>
                 {proker.tujuan && (
-                  <div className="card" style={{ background: 'var(--ghost-purple)', border: '1px solid var(--pale-lilac)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                      <Target size={18} style={{ color: 'var(--vistara-purple)' }} />
-                      <h3 style={{ fontSize: '1.05rem', color: 'var(--deep-violet)', margin: 0 }}>Tujuan Program</h3>
+                  <ScrollReveal preset="slideLeft">
+                    <div className="card" style={{ background: 'var(--ghost-purple)', border: '1px solid var(--pale-lilac)', height: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <Target size={18} style={{ color: 'var(--vistara-purple)' }} />
+                        <h3 style={{ fontSize: '1.05rem', color: 'var(--deep-violet)', margin: 0 }}>Tujuan Program</h3>
+                      </div>
+                      <p style={{ fontSize: '0.88rem', color: 'var(--charcoal)', lineHeight: 1.65, margin: 0 }}>
+                        {proker.tujuan}
+                      </p>
                     </div>
-                    <p style={{ fontSize: '0.88rem', color: 'var(--charcoal)', lineHeight: 1.65, margin: 0 }}>
-                      {proker.tujuan}
-                    </p>
-                  </div>
+                  </ScrollReveal>
                 )}
 
                 {proker.fungsi && (
-                  <div className="card" style={{ background: 'var(--warm-white)', border: '1px solid var(--pale-lilac)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                      <ShieldCheck size={18} style={{ color: 'var(--royal-purple)' }} />
-                      <h3 style={{ fontSize: '1.05rem', color: 'var(--deep-violet)', margin: 0 }}>Fungsi Pokok</h3>
+                  <ScrollReveal preset="slideRight">
+                    <div className="card" style={{ background: 'var(--warm-white)', border: '1px solid var(--pale-lilac)', height: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <ShieldCheck size={18} style={{ color: 'var(--royal-purple)' }} />
+                        <h3 style={{ fontSize: '1.05rem', color: 'var(--deep-violet)', margin: 0 }}>Fungsi Pokok</h3>
+                      </div>
+                      <p style={{ fontSize: '0.88rem', color: 'var(--charcoal)', lineHeight: 1.65, margin: 0 }}>
+                        {proker.fungsi}
+                      </p>
                     </div>
-                    <p style={{ fontSize: '0.88rem', color: 'var(--charcoal)', lineHeight: 1.65, margin: 0 }}>
-                      {proker.fungsi}
-                    </p>
-                  </div>
+                  </ScrollReveal>
                 )}
               </div>
             )}
 
             {/* ── BENTUK PELAKSANAAN / KEGIATAN ── */}
             {proker.bentukKegiatan && proker.bentukKegiatan.length > 0 && (
-              <div className="card" style={{ marginBottom: '1.75rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                  <Sparkles size={18} style={{ color: 'var(--vistara-purple)' }} />
-                  <h3 style={{ fontSize: '1.15rem', color: 'var(--deep-violet)', margin: 0 }}>Bentuk Pelaksanaan Kegiatan</h3>
+              <ScrollReveal preset="fadeUp" delay={0.05}>
+                <div className="card" style={{ marginBottom: '1.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <Sparkles size={18} style={{ color: 'var(--vistara-purple)' }} />
+                    <h3 style={{ fontSize: '1.15rem', color: 'var(--deep-violet)', margin: 0 }}>Bentuk Pelaksanaan Kegiatan</h3>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {proker.bentukKegiatan.map((bk, i) => (
+                      <div key={i} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                        <CheckCircle2 size={18} style={{ color: '#2E7D32', flexShrink: 0, marginTop: '2px' }} />
+                        <span style={{ fontSize: '0.9rem', color: 'var(--charcoal)', lineHeight: 1.6 }}>{bk}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {proker.bentukKegiatan.map((bk, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                      <CheckCircle2 size={18} style={{ color: '#2E7D32', flexShrink: 0, marginTop: '2px' }} />
-                      <span style={{ fontSize: '0.9rem', color: 'var(--charcoal)', lineHeight: 1.6 }}>{bk}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              </ScrollReveal>
             )}
 
-            {/* ── MEKANISME PELAKSANAAN (Jika Ada, misal Kotak Aspirasi) ── */}
+            {/* ── MEKANISME PELAKSANAAN ── */}
             {proker.mekanisme && proker.mekanisme.length > 0 && (
-              <div className="card" style={{ marginBottom: '1.75rem', background: 'var(--ghost-purple)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                  <Lightbulb size={18} style={{ color: 'var(--vistara-purple)' }} />
-                  <h3 style={{ fontSize: '1.15rem', color: 'var(--deep-violet)', margin: 0 }}>Alur & Mekanisme Pelaksanaan</h3>
+              <ScrollReveal preset="fadeUp" delay={0.08}>
+                <div className="card" style={{ marginBottom: '1.75rem', background: 'var(--ghost-purple)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                    <Lightbulb size={18} style={{ color: 'var(--vistara-purple)' }} />
+                    <h3 style={{ fontSize: '1.15rem', color: 'var(--deep-violet)', margin: 0 }}>Alur & Mekanisme Pelaksanaan</h3>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {proker.mekanisme.map((mek, i) => (
+                      <ScrollReveal key={i} preset="slideLeft" delay={i * 0.05}>
+                        <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start', background: 'white', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid var(--pale-lilac)' }}>
+                          <span style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--lavender-mist)', color: 'var(--deep-violet)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.75rem', flexShrink: 0, marginTop: '1px' }}>
+                            {i + 1}
+                          </span>
+                          <span style={{ fontSize: '0.88rem', color: 'var(--charcoal)', lineHeight: 1.6 }}>{mek}</span>
+                        </div>
+                      </ScrollReveal>
+                    ))}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {proker.mekanisme.map((mek, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start', background: 'white', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid var(--pale-lilac)' }}>
-                      <span style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--lavender-mist)', color: 'var(--deep-violet)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.75rem', flexShrink: 0, marginTop: '1px' }}>
-                        {i + 1}
-                      </span>
-                      <span style={{ fontSize: '0.88rem', color: 'var(--charcoal)', lineHeight: 1.6 }}>{mek}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              </ScrollReveal>
             )}
 
             {/* ── OUTPUT KONKRET & MANFAAT ── */}
             {((proker.outputKonkret && proker.outputKonkret.length > 0) || (proker.manfaat && proker.manfaat.length > 0)) && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginBottom: '1.75rem' }}>
                 {proker.outputKonkret && proker.outputKonkret.length > 0 && (
-                  <div className="card" style={{ borderTop: '3px solid var(--vistara-purple)' }}>
-                    <h3 style={{ fontSize: '1.05rem', color: 'var(--deep-violet)', marginBottom: '0.75rem' }}>Output Konkret</h3>
-                    <ul style={{ margin: 0, paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--charcoal)' }}>
-                      {proker.outputKonkret.map((out, idx) => (
-                        <li key={idx}>{out}</li>
-                      ))}
-                    </ul>
-                  </div>
+                  <ScrollReveal preset="fadeUp">
+                    <div className="card" style={{ borderTop: '3px solid var(--vistara-purple)', height: '100%' }}>
+                      <h3 style={{ fontSize: '1.05rem', color: 'var(--deep-violet)', marginBottom: '0.75rem' }}>Output Konkret</h3>
+                      <ul style={{ margin: 0, paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--charcoal)' }}>
+                        {proker.outputKonkret.map((out, idx) => (
+                          <li key={idx}>{out}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </ScrollReveal>
                 )}
 
                 {proker.manfaat && proker.manfaat.length > 0 && (
-                  <div className="card" style={{ borderTop: '3px solid #2E7D32' }}>
-                    <h3 style={{ fontSize: '1.05rem', color: 'var(--deep-violet)', marginBottom: '0.75rem' }}>Manfaat Utama</h3>
-                    <ul style={{ margin: 0, paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--charcoal)' }}>
-                      {proker.manfaat.map((man, idx) => (
-                        <li key={idx}>{man}</li>
-                      ))}
-                    </ul>
-                  </div>
+                  <ScrollReveal preset="fadeUp" delay={0.07}>
+                    <div className="card" style={{ borderTop: '3px solid #2E7D32', height: '100%' }}>
+                      <h3 style={{ fontSize: '1.05rem', color: 'var(--deep-violet)', marginBottom: '0.75rem' }}>Manfaat Utama</h3>
+                      <ul style={{ margin: 0, paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--charcoal)' }}>
+                        {proker.manfaat.map((man, idx) => (
+                          <li key={idx}>{man}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </ScrollReveal>
                 )}
               </div>
             )}
 
             {/* ── CATATAN / SOP KHUSUS ── */}
             {proker.catatan && (
-              <div style={{ background: 'rgba(201, 168, 76, 0.12)', border: '1px solid var(--gold-accent)', borderRadius: '12px', padding: '1rem 1.25rem', marginBottom: '1.75rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                <AlertTriangle size={20} style={{ color: '#8A6812', flexShrink: 0, marginTop: '2px' }} />
-                <div>
-                  <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.75rem', fontWeight: 700, color: '#8A6812', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    Catatan Protokol / Persyaratan
+              <ScrollReveal preset="blurIn">
+                <div style={{ background: 'rgba(201, 168, 76, 0.12)', border: '1px solid var(--gold-accent)', borderRadius: '12px', padding: '1rem 1.25rem', marginBottom: '1.75rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                  <AlertTriangle size={20} style={{ color: '#8A6812', flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.75rem', fontWeight: 700, color: '#8A6812', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Catatan Protokol / Persyaratan
+                    </div>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--charcoal)', margin: '0.25rem 0 0', lineHeight: 1.6 }}>
+                      {proker.catatan}
+                    </p>
                   </div>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--charcoal)', margin: '0.25rem 0 0', lineHeight: 1.6 }}>
-                    {proker.catatan}
-                  </p>
                 </div>
-              </div>
+              </ScrollReveal>
             )}
 
-            {/* ── GRID METADATA: TIMELINE, TARGET, PELAKSANA, PJ ── */}
+            {/* ── GRID METADATA ── */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: '1rem', marginBottom: '2.5rem' }}>
               <div className="card" style={{ padding: '1.25rem', display: 'flex', gap: '0.875rem', alignItems: 'flex-start', minWidth: 0 }}>
                 <Clock size={20} style={{ color: 'var(--vistara-purple)', marginTop: '2px', flexShrink: 0 }} />
@@ -228,7 +246,7 @@ export default function ProgramKerjaDetailPage() {
                       to={`/beranda/program-kerja/${rel.slug}`}
                       style={{ textDecoration: 'none' }}
                     >
-                      <div className="card" style={{ padding: '1rem', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                      <TiltSpotlightCard style={{ padding: '1rem', height: '100%' }}>
                         <span className="badge" style={{ background: `${rel.komisiColor}18`, color: rel.komisiColor, fontSize: '0.62rem', alignSelf: 'flex-start', marginBottom: '0.4rem' }}>
                           {rel.komisi}
                         </span>
@@ -238,13 +256,12 @@ export default function ProgramKerjaDetailPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--vistara-purple)', fontSize: '0.78rem', fontWeight: 700, marginTop: 'auto' }}>
                           Lihat Program <ArrowRight size={13} />
                         </div>
-                      </div>
+                      </TiltSpotlightCard>
                     </Link>
                   ))}
                 </div>
               </div>
             )}
-
           </div>
         </div>
       </section>

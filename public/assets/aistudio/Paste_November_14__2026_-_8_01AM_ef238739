@@ -1,0 +1,1049 @@
+# MASTER PROMPT: ULTIMATE WEBSITE ANIMATION, INTERACTION & VISUAL EXPERIENCE TRANSFORMATION
+
+## ROLE & EXPERTISE
+
+Bertindaklah sebagai **World-Class Creative Frontend Engineer, Senior UI/UX Motion Designer, Creative Developer, WebGL Specialist, dan Interactive Web Experience Architect**.
+
+Kamu memiliki keahlian mendalam dalam:
+- Advanced frontend engineering.
+- Creative web development.
+- High-end website animation.
+- Interactive UI/UX design.
+- Motion design dan animation choreography.
+- 3D web experiences dan WebGL.
+- CSS animations dan advanced JavaScript interactions.
+- GSAP, Motion, Three.js, React Three Fiber, dan Lenis.
+- Modern component architecture.
+- Performance optimization dan accessibility.
+
+Tugas utamamu adalah melakukan transformasi menyeluruh terhadap website yang sedang berada di dalam project ini sehingga pengalaman website terasa jauh lebih hidup, dinamis, immersive, interaktif, polished, sophisticated, dan premium.
+
+**JANGAN hanya memberikan rekomendasi, demonstrasi, tutorial, atau contoh kode. IMPLEMENTASIKAN LANGSUNG perubahan tersebut ke dalam seluruh source code project website yang tersedia.**
+
+---
+
+# 01. MAIN OBJECTIVE
+
+Saya ingin meningkatkan kualitas animasi dan interaktivitas website secara SIGNIFIKAN.
+
+Website harus memiliki pengalaman visual yang kaya dengan berbagai macam animasi profesional, micro-interactions, hover effects, scroll-based animations, parallax effects, 3D interactions, animated typography, dynamic backgrounds, cursor interactions, transition effects, dan berbagai efek kreatif lainnya.
+
+Jangan membatasi implementasi hanya pada satu atau dua jenis animasi.
+
+Eksplorasi sebanyak mungkin teknik animation dan interaction yang relevan, kemudian implementasikan secara menyeluruh pada seluruh bagian website.
+
+Target pengalaman yang ingin dicapai:
+
+- Extremely Interactive.
+- Motion-Rich.
+- Visually Immersive.
+- Smooth and Fluid.
+- Modern and Futuristic.
+- Sophisticated and Premium.
+- Highly Responsive.
+- Delightful Micro-interactions.
+- Cinematic Scrolling Experience.
+- Rich Visual Details.
+- Professional Motion Design.
+
+Saya ingin setiap bagian website memiliki kehidupan dan karakter interaksinya sendiri.
+
+Ketika pengguna menggerakkan cursor, melakukan hover, mengklik tombol, melakukan scrolling, berpindah halaman, atau berinteraksi dengan komponen, website harus memberikan respons visual yang menarik dan terasa natural.
+
+Namun, seluruh animasi harus tetap memiliki tujuan desain. Hindari animasi yang sekadar ramai tanpa meningkatkan pengalaman pengguna.
+
+---
+
+# 02. DESIGN & DEVELOPMENT INSPIRATION
+
+Gunakan website, library, framework, dan eksperimen berikut sebagai sumber inspirasi utama.
+
+Jangan terpaku pada satu library. Kombinasikan berbagai pendekatan dan teknik terbaiknya.
+
+### A. Animated UI Components
+
+Eksplorasi dan gunakan komponen atau efek yang terinspirasi dari:
+
+1. React Bits: https://www.reactbits.dev/
+2. Magic UI: https://magicui.design/
+3. Aceternity UI: https://ui.aceternity.com/
+4. Motion Primitives: https://motion-primitives.com/
+5. Animate UI: https://animate-ui.com/
+6. 21st.dev: https://21st.dev/
+7. Hover.dev: https://www.hover.dev/
+8. Uiverse: https://uiverse.io/
+
+Fokus eksplorasi:
+- Animated text.
+- Interactive cards.
+- Magnetic buttons.
+- Moving borders.
+- Spotlight effects.
+- Glowing effects.
+- Interactive backgrounds.
+- Animated navigation.
+- Infinite marquees.
+- Reveal animations.
+- Particle effects.
+- 3D tilt cards.
+- Dynamic gradients.
+- Interactive icons.
+- Hover transitions.
+- Advanced UI components.
+
+### B. 3D & WebGL Experiences
+
+Eksplorasi:
+
+1. Spline: https://spline.design/
+2. Three.js: https://threejs.org/
+3. React Three Fiber: https://r3f.docs.pmnd.rs/
+4. Drei: https://github.com/pmndrs/drei
+5. Unicorn Studio: https://www.unicorn.studio/
+
+Fokus eksplorasi:
+- Interactive 3D objects.
+- Floating 3D elements.
+- Mouse-responsive 3D objects.
+- Depth and perspective.
+- 3D card interactions.
+- WebGL backgrounds.
+- Particle systems.
+- Animated lighting.
+- Distortion effects.
+- Shader-based visuals.
+- Interactive geometry.
+- Depth-based parallax.
+
+### C. Animation Engines
+
+Eksplorasi:
+
+1. GSAP: https://gsap.com/
+2. Motion: https://motion.dev/
+3. Lenis: https://lenis.darkroom.engineering/
+4. Rive: https://rive.app/
+5. LottieFiles: https://lottiefiles.com/
+
+Fokus eksplorasi:
+- Scroll-triggered animations.
+- Timeline animations.
+- Spring animations.
+- Layout transitions.
+- Staggered animations.
+- Scroll-based transformations.
+- Smooth scrolling.
+- Page transitions.
+- Interactive gestures.
+- Animated SVG.
+- State-driven animations.
+- Advanced motion choreography.
+
+### D. Creative Development Inspiration
+
+Eksplorasi:
+
+1. Awwwards: https://www.awwwards.com/
+2. Codrops: https://tympanus.net/codrops/
+3. CodePen: https://codepen.io/
+4. Godly: https://godly.website/
+
+Pelajari dan adaptasikan berbagai pendekatan kreatif dalam pengembangan website modern, khususnya eksperimen CSS, JavaScript, typography, WebGL, hover interactions, scroll effects, dan visual transitions.
+
+**PENTING:** Gunakan referensi tersebut untuk menghasilkan implementasi yang orisinal dan sesuai dengan website ini. Jangan sekadar menyalin keseluruhan desain atau identitas website lain.
+
+---
+
+# 03. COMPLETE WEBSITE ANIMATION AUDIT
+
+Sebelum melakukan implementasi, lakukan audit menyeluruh terhadap seluruh struktur project.
+
+Identifikasi:
+- Framework dan teknologi yang digunakan.
+- Seluruh halaman dan routes.
+- Layout dan shared components.
+- Navigation system.
+- Hero sections.
+- Typography dan text elements.
+- Cards dan content containers.
+- Buttons dan interactive elements.
+- Images, illustrations, dan icons.
+- Background elements.
+- Forms dan input components.
+- Footer dan secondary sections.
+- Existing animations dan transition systems.
+- Existing dependencies dan libraries.
+
+Periksa SEMUA halaman, bukan hanya homepage.
+
+Buat pemetaan elemen yang dapat diberikan animasi dan interaksi.
+
+Kemudian implementasikan peningkatan secara sistematis ke seluruh website.
+
+**Jangan melewatkan komponen hanya karena berada di halaman sekunder atau bagian bawah halaman.**
+
+---
+
+# 04. GLOBAL INTERACTION SYSTEM
+
+Bangun sistem interaksi global yang konsisten dan dapat digunakan di seluruh halaman website.
+
+Implementasikan sebanyak mungkin efek berikut sesuai konteks.
+
+### A. Cursor Interaction System
+
+Buat pengalaman cursor yang lebih interaktif pada desktop:
+
+- Custom animated cursor.
+- Cursor follower.
+- Cursor trailing effect.
+- Cursor scale transformation.
+- Magnetic cursor interaction.
+- Cursor spotlight.
+- Cursor-following glow.
+- Cursor-reactive background.
+- Hover cursor transformation.
+- Cursor distortion interaction.
+- Interactive cursor labels.
+- Cursor proximity effects.
+- Smooth cursor movement.
+
+Pada elemen tertentu, cursor dapat berubah secara kontekstual ketika melakukan hover pada button, link, image, card, atau elemen interaktif lainnya.
+
+Pastikan custom cursor tidak mengganggu usability, selection, accessibility, atau native pointer behavior.
+
+### B. Global Hover Effects
+
+Berikan respons hover yang lebih kaya pada berbagai komponen:
+
+- Scale transitions.
+- 3D tilt.
+- Perspective rotation.
+- Magnetic movement.
+- Dynamic shadows.
+- Glowing borders.
+- Spotlight tracking.
+- Animated gradients.
+- Image zoom.
+- Image distortion.
+- Color transitions.
+- Border transformations.
+- Text displacement.
+- Icon animations.
+- Background transformations.
+- Depth transitions.
+
+Variasikan efek berdasarkan jenis komponen. Jangan membuat semua elemen memiliki animasi identik.
+
+### C. Click & Press Interactions
+
+Implementasikan:
+
+- Button press animation.
+- Spring-based scaling.
+- Ripple effects.
+- Animated feedback.
+- Icon morphing.
+- Loading transitions.
+- Interactive toggles.
+- Expand and collapse animations.
+- State transition effects.
+
+Semua interaksi harus memberikan feedback yang jelas tanpa mengubah fungsi asli komponen.
+
+---
+
+# 05. ADVANCED TYPOGRAPHY ANIMATIONS
+
+Typography merupakan salah satu elemen visual utama.
+
+Jangan membiarkan seluruh teks tampil secara statis apabila animasi dapat meningkatkan penyampaian kontennya.
+
+Eksplorasi dan implementasikan:
+
+- Split-text animations.
+- Character-by-character reveal.
+- Word-by-word reveal.
+- Line-by-line reveal.
+- Blur-to-focus text.
+- Masked text reveal.
+- Clip-path typography.
+- Text gradient animation.
+- Animated stroke text.
+- Text scramble effects.
+- Typewriter effects.
+- Text wave animation.
+- Rotating text.
+- Text morphing.
+- Scroll-linked typography.
+- Parallax text.
+- Kinetic typography.
+- Text hover distortion.
+- Staggered text entrance.
+- Variable font transitions.
+- Animated counters.
+- Number rolling animations.
+
+Berikan perhatian khusus pada:
+- Hero titles.
+- Section headings.
+- Page headings.
+- Navigation labels.
+- Important descriptions.
+- Statistics.
+- CTA text.
+- Highlighted words.
+
+Hasil akhir harus memiliki motion typography yang elegan dan terarah, bukan sekadar animasi tulisan yang berlebihan.
+
+---
+
+# 06. HERO SECTION TRANSFORMATION
+
+Hero section merupakan area yang harus mendapatkan perhatian visual paling besar.
+
+Buat hero experience yang terasa memorable dan menarik sejak pertama kali website dibuka.
+
+Eksplorasi:
+
+- Cinematic entrance animations.
+- Multi-layered parallax.
+- Animated typography.
+- Background particle systems.
+- Floating visual objects.
+- 3D interactive elements.
+- Mouse-responsive elements.
+- Dynamic lighting.
+- Animated gradient meshes.
+- Spotlight effects.
+- Grid animations.
+- Moving backgrounds.
+- Interactive illustrations.
+- Image reveal masks.
+- Scroll-linked transformations.
+- Animated decorative shapes.
+- SVG motion graphics.
+- Layered depth effects.
+- Subtle ambient animations.
+
+Bila hero memiliki gambar atau visual, pertimbangkan:
+- Mouse-responsive image movement.
+- 3D image tilt.
+- Image reveal transitions.
+- Interactive image masks.
+- Dynamic image scaling.
+- Parallax image layers.
+- Subtle distortion.
+
+Jangan mengubah pesan, konten, atau identitas hero secara sembarangan.
+
+---
+
+# 07. NAVBAR & NAVIGATION ANIMATIONS
+
+Berikan perhatian khusus pada seluruh sistem navigasi.
+
+Implementasikan apabila sesuai:
+
+- Animated navbar entrance.
+- Smooth navbar transitions.
+- Scroll-responsive navbar.
+- Hide/reveal navigation on scroll.
+- Active link indicators.
+- Animated underline.
+- Magnetic navigation items.
+- Hover background transitions.
+- Animated dropdown menus.
+- Dropdown reveal animations.
+- Mobile menu transitions.
+- Full-screen navigation overlay.
+- Staggered menu items.
+- Animated hamburger icon.
+- Morphing navigation icons.
+- Smooth navigation state changes.
+- Page transition animations.
+
+Navbar harus terasa responsif dan polished, baik di desktop maupun mobile.
+
+Jangan merusak struktur navigasi, route, atau link yang sudah tersedia.
+
+---
+
+# 08. CARDS, CONTAINERS & CONTENT ELEMENTS
+
+Seluruh card dan content containers harus dievaluasi untuk mendapatkan efek interaktif yang sesuai.
+
+Implementasikan beberapa teknik berikut:
+
+- 3D tilt interaction.
+- Mouse-following light.
+- Spotlight border.
+- Glowing edges.
+- Moving gradient borders.
+- Animated shadows.
+- Perspective transitions.
+- Parallax layers.
+- Image zoom on hover.
+- Image reveal effects.
+- Content reveal.
+- Staggered entrance.
+- Floating animations.
+- Interactive backgrounds.
+- Card rotation.
+- Hover depth.
+- Magnetic movement.
+- Border radius morphing.
+- Animated card stacking.
+- Focus-state animations.
+- Scroll-triggered reveal.
+
+Untuk cards yang menampilkan gambar, buat interaksi yang lebih menarik antara gambar, teks, overlay, dan container.
+
+Untuk cards yang memiliki CTA atau link, berikan feedback visual saat pengguna melakukan interaksi.
+
+Jangan membuat semua cards terlihat sama apabila peran dan kontennya berbeda.
+
+---
+
+# 09. BUTTONS & CTA INTERACTIONS
+
+Terapkan peningkatan pada seluruh button dan call-to-action.
+
+Eksplorasi:
+
+- Magnetic buttons.
+- 3D button interaction.
+- Animated gradients.
+- Liquid hover effects.
+- Border animations.
+- Spotlight buttons.
+- Ripple interaction.
+- Arrow movement.
+- Icon morphing.
+- Text sliding.
+- Background fill transitions.
+- Spring-based interactions.
+- Press depth effects.
+- Cursor-following highlights.
+- Loading state transitions.
+- Success feedback animations.
+
+Pastikan button tetap memiliki ukuran klik yang nyaman dan tidak menyebabkan layout bergeser secara tidak sengaja.
+
+---
+
+# 10. IMAGE, MEDIA & VISUAL EFFECTS
+
+Berikan pengalaman visual yang lebih dinamis pada seluruh image dan media elements.
+
+Eksplorasi:
+
+- Image reveal masks.
+- Clip-path animation.
+- Parallax images.
+- 3D image tilt.
+- Hover zoom.
+- Grayscale-to-color transitions.
+- Image distortion.
+- Liquid transitions.
+- Image blur transitions.
+- Scroll-based image scaling.
+- Perspective transformations.
+- Animated image borders.
+- Interactive image overlays.
+- Sequential image reveals.
+- Floating image animations.
+- Image cursor interactions.
+
+Jika website memiliki video, pertimbangkan:
+- Smooth video reveal.
+- Scroll-linked scaling.
+- Interactive video controls.
+- Subtle hover transformations.
+- Elegant loading transitions.
+
+Jangan mengubah aset asli atau mengganti konten media tanpa alasan kuat.
+
+---
+
+# 11. BACKGROUND & AMBIENT ANIMATIONS
+
+Buat background website menjadi lebih hidup tanpa mengorbankan readability.
+
+Eksplorasi berbagai efek:
+
+### Gradient & Light Effects
+- Animated gradient backgrounds.
+- Aurora effects.
+- Moving radial gradients.
+- Ambient glow.
+- Dynamic spotlight.
+- Color shifting.
+- Light beams.
+- Soft lighting transitions.
+
+### Particle & Atmospheric Effects
+- Floating particles.
+- Interactive particles.
+- Starfield effects.
+- Dust particles.
+- Floating geometric shapes.
+- Animated noise.
+- Atmospheric fog.
+- Subtle background motion.
+
+### Advanced Visual Effects
+- Liquid distortion.
+- Glassmorphism effects.
+- Frosted glass transitions.
+- Mesh gradients.
+- SVG background animation.
+- Grid reveal animations.
+- Animated patterns.
+- Morphing backgrounds.
+- WebGL shader effects.
+- Mouse-responsive backgrounds.
+- Canvas visual effects.
+
+Gunakan efek yang sesuai dengan identitas visual website.
+
+Background harus melengkapi konten, bukan menyainginya.
+
+---
+
+# 12. SCROLL ANIMATION & CINEMATIC EXPERIENCE
+
+Ini merupakan salah satu prioritas paling penting.
+
+Buat pengalaman scrolling yang jauh lebih menarik, dengan motion choreography yang konsisten dari awal sampai akhir halaman.
+
+Eksplorasi:
+
+- Scroll-triggered reveal.
+- Scroll-linked parallax.
+- Sequential section entrances.
+- Staggered element animations.
+- Horizontal scroll sections.
+- Pinned sections.
+- Sticky content transitions.
+- Scroll-based image transformations.
+- Scroll-based typography.
+- Scale-on-scroll effects.
+- Fade and blur transitions.
+- Clip-path scroll reveals.
+- Background color transitions.
+- Layered parallax.
+- Scroll progress indicators.
+- Animated section separators.
+- Masked content transitions.
+- Depth-based scrolling.
+- Scroll-linked 3D objects.
+- Timeline animations.
+
+Gunakan GSAP ScrollTrigger atau Motion ketika memang paling sesuai.
+
+### Section Transition Choreography
+
+Setiap section harus memiliki cara masuk yang menarik.
+
+Contohnya:
+- Heading muncul dari bawah dengan stagger.
+- Description muncul dengan blur-to-focus.
+- Images muncul menggunakan masking.
+- Cards muncul secara berurutan.
+- Decorative elements bergerak secara parallax.
+- Background berubah secara gradual.
+- Icons melakukan micro-animation.
+
+Jangan membuat setiap section mengulang animasi yang sama.
+
+Buat variasi motion berdasarkan struktur, hierarki, dan konten masing-masing section.
+
+### Smooth Scrolling
+
+Jika menggunakan Lenis atau pendekatan smooth scrolling lainnya, integrasikan dengan benar bersama scroll-triggered animations.
+
+Pastikan:
+- Scroll tetap responsif.
+- Tidak terjadi konflik dengan GSAP.
+- Anchor navigation berfungsi.
+- Mobile scrolling tidak terganggu.
+- Scroll restoration tetap benar.
+- Touch gestures tetap natural.
+
+---
+
+# 13. 3D & IMMERSIVE INTERACTION
+
+Eksplorasi kemungkinan penambahan pengalaman 3D pada elemen yang memang dapat memperoleh manfaat dari kedalaman visual.
+
+Contoh:
+
+- Floating 3D objects.
+- Interactive 3D cards.
+- 3D hero elements.
+- Mouse-responsive 3D scenes.
+- Rotating 3D typography.
+- Interactive geometry.
+- 3D particles.
+- 3D background layers.
+- Perspective-based animations.
+- Dynamic camera movement.
+- Environment lighting.
+- Animated materials.
+- Shader distortions.
+- WebGL visual transitions.
+
+Pertimbangkan Spline atau React Three Fiber.
+
+Tidak semua halaman membutuhkan 3D. Pilih implementasi yang memberikan nilai visual nyata.
+
+Jangan membuat animasi 3D hanya untuk memenuhi jumlah efek.
+
+---
+
+# 14. ICONS, SVG & MICRO-INTERACTIONS
+
+Jangan biarkan icons selalu statis.
+
+Implementasikan:
+- Icon rotation.
+- Icon morphing.
+- Path drawing.
+- SVG stroke animations.
+- Animated arrows.
+- Animated checkmarks.
+- Interactive menu icons.
+- Bounce effects.
+- Spring transitions.
+- Hover transformations.
+- Icon scale transitions.
+- Sequential SVG animation.
+
+Berikan efek yang sesuai pada:
+- Social media icons.
+- Navigation icons.
+- Feature icons.
+- Action buttons.
+- Directional arrows.
+- Status indicators.
+- Decorative SVG illustrations.
+
+---
+
+# 15. ADDITIONAL CREATIVE EFFECT EXPLORATION
+
+Jangan berhenti pada kategori yang sudah disebutkan.
+
+Lakukan eksplorasi kreatif terhadap berbagai teknik modern lainnya, termasuk:
+
+1. Liquid hover effects.
+2. Gooey effects.
+3. Morphing blob animations.
+4. Magnetic interactions.
+5. Pixel transition effects.
+6. Displacement mapping.
+7. Chromatic aberration.
+8. RGB split effects.
+9. Noise and grain animation.
+10. Halftone visual effects.
+11. Glitch transitions.
+12. Neon glow.
+13. Animated SVG paths.
+14. Infinite marquee.
+15. Logo reveal animations.
+16. 3D flip interactions.
+17. Animated borders.
+18. Floating UI elements.
+19. Interactive grid systems.
+20. Cursor-reactive particles.
+21. Image displacement.
+22. Split-screen transitions.
+23. Animated navigation indicators.
+24. Scroll-driven transformations.
+25. Interactive gradient text.
+26. Elastic animations.
+27. Spring-based motion.
+28. Shape morphing.
+29. Masked transitions.
+30. Animated progress indicators.
+31. Number counters.
+32. Text scramble transitions.
+33. Hover image previews.
+34. Magnetic typography.
+35. Interactive timeline animations.
+36. Reveal-on-proximity effects.
+37. Interactive background grids.
+38. Depth-based parallax.
+39. Animated loading sequences.
+40. Cinematic page transitions.
+
+Eksplorasi juga ide-ide eksperimental dari Codrops, CodePen, React Bits, dan komunitas creative frontend development.
+
+**Jangan membatasi kreativitas pada daftar ini. Cari dan implementasikan efek lain yang relevan selama memberikan kontribusi positif terhadap pengalaman website.**
+
+---
+
+# 16. PAGE TRANSITIONS & LOADING EXPERIENCES
+
+Jika website memiliki beberapa halaman atau routes, tingkatkan transisinya.
+
+Eksplorasi:
+- Page entrance transitions.
+- Page exit transitions.
+- Route-based animations.
+- Shared element transitions.
+- Fade transitions.
+- Slide transitions.
+- Scale transitions.
+- Masked page reveals.
+- Loading screen animations.
+- Animated logo loaders.
+- Skeleton transitions.
+- Content reveal after loading.
+
+Loading animation tidak boleh menutupi konten terlalu lama atau memberikan kesan website lambat.
+
+Jangan mengganggu browser back/forward navigation.
+
+---
+
+# 17. RESPONSIVE & MOBILE INTERACTIONS
+
+Semua peningkatan wajib mempertimbangkan desktop, tablet, dan mobile.
+
+Jangan hanya mengoptimalkan pengalaman desktop.
+
+### Desktop
+Manfaatkan mouse interaction, hover effects, cursor effects, perspective, parallax, dan berbagai interaksi pointer.
+
+### Mobile
+Adaptasikan animasi agar sesuai dengan touch interactions.
+
+Contohnya:
+- Tap feedback.
+- Touch-responsive elements.
+- Swipe transitions.
+- Scroll-based reveals.
+- Mobile-friendly card interactions.
+- Optimized particle effects.
+- Simplified 3D interactions.
+- Responsive navigation transitions.
+
+Perlu diperhatikan:
+- Jangan bergantung pada hover untuk mengakses fungsi utama.
+- Hindari custom cursor pada perangkat touch.
+- Hindari efek yang membuat scrolling berat.
+- Pastikan setiap tombol tetap mudah diakses.
+- Jangan membuat layout bergeser karena animasi.
+
+---
+
+# 18. TECHNICAL IMPLEMENTATION STRATEGY
+
+Lakukan implementasi secara profesional.
+
+### A. Inspect Existing Technology
+
+Pertama, identifikasi stack yang sedang digunakan.
+
+Jangan mengganti framework, arsitektur, atau struktur project secara sembarangan.
+
+Pertahankan teknologi yang sudah digunakan apabila masih layak.
+
+### B. Library Selection
+
+Gunakan library yang paling relevan dengan efek yang dibutuhkan.
+
+Prioritaskan:
+- GSAP untuk advanced timelines, scroll choreography, dan kompleksitas animasi.
+- Motion untuk React component transitions, gestures, dan layout animations.
+- React Bits untuk animated components.
+- Magic UI untuk premium UI effects.
+- Aceternity UI untuk interactive visual components.
+- Lenis untuk smooth scrolling.
+- Three.js atau React Three Fiber untuk 3D.
+- Spline untuk integrasi 3D visual.
+- Rive atau Lottie untuk animation assets.
+
+Jangan menginstal semua library secara membabi buta.
+
+Pilih library berdasarkan kebutuhan, kompatibilitas, ukuran bundle, dan kemampuan teknologi project.
+
+Jika terdapat efek sederhana yang dapat dibuat dengan CSS atau native JavaScript, tidak perlu menginstal library tambahan.
+
+### C. Existing Dependencies
+
+Sebelum menginstal dependency:
+- Periksa package.json.
+- Identifikasi dependency yang sudah tersedia.
+- Hindari package duplication.
+- Periksa kompatibilitas versi.
+- Gunakan versi stabil yang kompatibel.
+- Hindari dependency yang tidak digunakan.
+
+Jangan mengarang nama package atau API.
+
+### D. Component Architecture
+
+Jika memungkinkan, bangun reusable animation utilities dan shared components agar implementasi konsisten.
+
+Contohnya:
+- AnimationProvider.
+- ScrollReveal.
+- TextReveal.
+- MagneticButton.
+- TiltCard.
+- SpotlightCard.
+- AnimatedBackground.
+- PageTransition.
+- SmoothScrollProvider.
+- CursorEffect.
+- ParallaxElement.
+
+Nama dan struktur tersebut hanyalah contoh. Sesuaikan dengan arsitektur project yang sudah ada.
+
+Jangan menciptakan abstraction berlebihan untuk efek sederhana.
+
+### E. Animation Lifecycle
+
+Pastikan animasi:
+- Memiliki lifecycle yang benar.
+- Dibersihkan ketika komponen unmount.
+- Tidak menyebabkan memory leaks.
+- Tidak membuat event listeners menumpuk.
+- Tidak menjalankan animation loops yang tidak diperlukan.
+- Tidak mengganggu re-render.
+- Tidak menyebabkan hydration mismatch.
+- Tidak menyebabkan konflik antar-library.
+
+Untuk React dan Next.js, perhatikan client/server component boundaries.
+
+---
+
+# 19. PERFORMANCE OPTIMIZATION
+
+Banyak animasi bukan berarti website harus menjadi berat.
+
+Pertahankan pengalaman yang kaya tanpa mengorbankan performa.
+
+Terapkan prinsip berikut:
+
+- Prioritaskan transform dan opacity.
+- Gunakan GPU-friendly animations.
+- Hindari animasi layout yang tidak diperlukan.
+- Batasi jumlah particle.
+- Optimalkan canvas dan WebGL.
+- Lazy-load visual effects yang berat.
+- Hindari animasi offscreen yang terus berjalan.
+- Gunakan Intersection Observer ketika relevan.
+- Gunakan will-change secara selektif.
+- Hindari terlalu banyak simultaneous animation loops.
+- Optimalkan gambar dan media.
+- Hindari layout shifts.
+- Pertimbangkan device capability.
+- Kurangi efek berat pada perangkat low-end.
+- Hindari render ulang yang tidak perlu.
+
+Jangan mengorbankan performa hanya untuk mengejar efek visual.
+
+Targetkan pengalaman yang tetap smooth dan responsif pada perangkat nyata.
+
+---
+
+# 20. ACCESSIBILITY & USER CONTROL
+
+Seluruh pengalaman interaktif harus tetap dapat diakses.
+
+Implementasikan:
+- prefers-reduced-motion.
+- Accessible navigation.
+- Keyboard interaction.
+- Visible focus states.
+- Proper button semantics.
+- Screen reader compatibility.
+- Sufficient color contrast.
+- Proper touch targets.
+
+Pengguna yang memilih reduced motion harus mendapatkan versi website dengan gerakan minimal tanpa kehilangan konten maupun fungsi utama.
+
+Animasi tidak boleh menjadi satu-satunya cara untuk menyampaikan informasi penting.
+
+---
+
+# 21. VISUAL CONSISTENCY & BRAND PRESERVATION
+
+INI ADALAH ATURAN PENTING.
+
+Meskipun saya meminta peningkatan animasi dan efek dalam jumlah sangat banyak, jangan merusak identitas visual website yang sudah ada.
+
+Pertahankan:
+- Existing brand identity.
+- Color palette.
+- Typography.
+- Layout.
+- Content hierarchy.
+- Spacing system.
+- Component structure.
+- Existing imagery.
+- Logo.
+- Branding.
+- Website personality.
+- Existing content.
+- Core user experience.
+
+Jangan mengubah desain website menjadi template generik dari library tertentu.
+
+Jangan mengganti seluruh visual identity hanya karena ingin menerapkan animasi baru.
+
+Semua animasi harus terasa sebagai evolusi alami dari desain asli website.
+
+**Visual quality tetap harus lebih penting daripada kuantitas efek.**
+
+Website harus terlihat seperti sebuah karya creative development profesional, bukan kumpulan demo animasi yang ditempelkan secara acak.
+
+---
+
+# 22. IMPLEMENTATION PRIORITY
+
+Kerjakan transformasi melalui beberapa tahap berikut.
+
+### PHASE 1: AUDIT
+Analisis keseluruhan source code dan identifikasi seluruh halaman serta komponen.
+
+### PHASE 2: GLOBAL MOTION FOUNDATION
+Bangun fondasi animasi, reusable utilities, global transitions, serta sistem interaksi utama.
+
+### PHASE 3: COMPONENT TRANSFORMATION
+Tingkatkan seluruh komponen seperti:
+- Navbar.
+- Buttons.
+- Cards.
+- Typography.
+- Images.
+- Icons.
+- Forms.
+- Navigation.
+- Backgrounds.
+- Content sections.
+- Footer.
+
+### PHASE 4: ADVANCED INTERACTIONS
+Implementasikan cursor interaction, magnetic effects, 3D tilt, spotlight, particles, animated gradients, dan micro-interactions lainnya.
+
+### PHASE 5: SCROLL & PAGE EXPERIENCES
+Implementasikan scroll-triggered animations, parallax, sequential reveals, page transitions, dan smooth scrolling.
+
+### PHASE 6: 3D & EXPERIMENTAL VISUALS
+Tambahkan 3D, WebGL, shader effects, dan experimental visual effects pada area yang tepat.
+
+### PHASE 7: RESPONSIVENESS & OPTIMIZATION
+Optimalkan semua implementasi untuk desktop, tablet, dan mobile.
+
+### PHASE 8: FINAL QUALITY ASSURANCE
+Jalankan pemeriksaan menyeluruh terhadap hasil akhir.
+
+---
+
+# 23. STRICT RULES
+
+Ikuti seluruh aturan berikut selama pengerjaan.
+
+1. Jangan hanya membuat demo atau contoh terpisah. Terapkan langsung ke website yang sedang dikerjakan.
+2. Jangan hanya mengubah homepage. Audit dan tingkatkan seluruh halaman dan shared components.
+3. Jangan menghapus konten, fitur, section, route, maupun fungsi yang sudah ada.
+4. Jangan mengganti desain utama atau branding tanpa alasan teknis yang benar-benar diperlukan.
+5. Jangan membuat semua elemen memiliki animasi yang sama.
+6. Jangan menggunakan efek yang berlebihan hingga mengganggu keterbacaan.
+7. Jangan menambahkan dependency yang tidak diperlukan.
+8. Jangan membuat animasi yang menyebabkan scrolling terganggu.
+9. Jangan membuat efek yang hanya berfungsi pada desktop.
+10. Jangan membuat 3D elements yang menutupi konten penting.
+11. Jangan membiarkan animasi berjalan tanpa kontrol ketika sudah tidak diperlukan.
+12. Jangan menggunakan placeholder atau dummy content.
+13. Jangan meninggalkan implementasi setengah jadi.
+14. Jangan hanya memberikan instruksi mengenai file mana yang harus diubah. Lakukan perubahan langsung.
+15. Jangan melakukan rewrite seluruh project apabila perubahan terarah sudah cukup.
+16. Pertahankan seluruh integrasi dan API yang sudah digunakan.
+17. Pastikan tidak ada broken links atau interaksi yang kehilangan fungsi.
+18. Pastikan tidak ada error baru akibat implementasi animasi.
+19. Jangan mengorbankan accessibility dan mobile usability.
+20. Prioritaskan kualitas implementasi, bukan sekadar jumlah efek.
+
+---
+
+# 24. FINAL QUALITY ASSURANCE
+
+Setelah implementasi selesai, lakukan pemeriksaan terhadap seluruh website.
+
+Verifikasi:
+
+- Semua halaman tetap berfungsi.
+- Semua navigation dan routes berjalan.
+- Semua buttons tetap berfungsi.
+- Semua links tetap valid.
+- Semua cards dan interactive elements berfungsi.
+- Semua animasi berjalan sesuai konteks.
+- Tidak terdapat animation conflicts.
+- Tidak terdapat hydration errors.
+- Tidak terdapat console errors baru.
+- Tidak terdapat broken imports.
+- Tidak terdapat dependency issues.
+- Tidak terdapat layout overflow.
+- Tidak terdapat horizontal scrolling yang tidak disengaja.
+- Desktop dan mobile tetap responsif.
+- Scroll experience tetap smooth.
+- Reduced motion tetap didukung.
+- Tidak ada memory leaks akibat animation lifecycle.
+- Tidak ada konten yang tertutup oleh efek visual.
+
+Jika tersedia browser preview atau testing tools, gunakan untuk menguji seluruh halaman dan interaksi secara langsung.
+
+Perbaiki setiap masalah yang ditemukan sebelum menyatakan pekerjaan selesai.
+
+---
+
+# 25. EXPECTED FINAL RESULT
+
+Saya mengharapkan website yang mengalami peningkatan besar dalam kualitas motion design dan interaktivitas.
+
+Website harus memiliki:
+
+- Rich animated UI.
+- Beautiful micro-interactions.
+- Cinematic scroll experiences.
+- Dynamic typography.
+- Interactive cards.
+- Premium hover effects.
+- Smooth transitions.
+- Engaging cursor interactions.
+- Beautiful animated backgrounds.
+- Advanced visual details.
+- Selective 3D experiences.
+- Responsive animations.
+- Consistent motion language.
+- Professional frontend implementation.
+
+Setiap bagian website harus terasa lebih hidup, responsif, dan menyenangkan untuk dijelajahi.
+
+Pengalaman pengguna harus terasa dirancang dengan sengaja, bukan hanya dipenuhi animasi tanpa arah.
+
+**FINAL DIRECTIVE:**
+
+Sekarang mulai audit project, pahami keseluruhan arsitektur, eksplorasi referensi yang relevan, lalu implementasikan transformasi animasi dan interaktivitas secara langsung ke seluruh website.
+
+Jangan berhenti pada tahap perencanaan.
+
+Jangan hanya memberikan daftar rekomendasi.
+
+Jangan hanya mengubah beberapa komponen.
+
+Lakukan peningkatan menyeluruh, sistematis, dan berkualitas tinggi terhadap SEMUA HALAMAN DAN SELURUH ELEMEN WEBSITE YANG RELEVAN.
+
+Eksplorasi berbagai kemungkinan motion design dan creative frontend development seluas mungkin.
+
+Saya ingin hasil akhirnya menjadi website dengan pengalaman interaktif yang jauh lebih kaya, visual yang extraordinary, motion design yang sophisticated, dan implementasi teknis yang profesional.
+
+**MAKE THE ENTIRE WEBSITE FEEL ALIVE.**
+
+**PUSH THE INTERACTIVITY. ELEVATE THE MOTION. REDEFINE THE EXPERIENCE.**

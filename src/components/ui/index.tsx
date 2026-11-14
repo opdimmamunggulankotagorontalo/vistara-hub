@@ -1,4 +1,6 @@
 import type { ReactNode, CSSProperties } from 'react';
+import { motion } from 'motion/react';
+import { SplitText, TiltSpotlightCard } from '../motion/MotionPrimitives';
 
 // ─── SectionHeading ────────────────────────────────────────────
 
@@ -22,26 +24,61 @@ export function SectionHeading({
   children,
 }: SectionHeadingProps) {
   const textColor = dark ? 'white' : 'var(--deep-violet)';
-  const subColor = dark ? 'rgba(185,154,225,0.8)' : 'var(--mid-grey)';
-  const centerStyle: CSSProperties = align === 'center' ? { textAlign: 'center', alignItems: 'center' } : {};
+  const subColor = dark ? 'rgba(185,154,225,0.85)' : 'var(--mid-grey)';
+  const centerStyle: CSSProperties =
+    align === 'center' ? { textAlign: 'center', alignItems: 'center' } : {};
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', ...centerStyle }}>
       {label && (
-        <div className={`section-label ${dark ? 'section-label-light' : ''}`} style={align === 'center' ? { justifyContent: 'center' } : {}}>
+        <motion.div
+          initial={{ opacity: 0, x: align === 'center' ? 0 : -14 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className={`section-label ${dark ? 'section-label-light' : ''}`}
+          style={align === 'center' ? { justifyContent: 'center' } : {}}
+        >
           {label}
-        </div>
+        </motion.div>
       )}
       <h2 style={{ color: textColor, marginBottom: '0' }}>
-        {title}
+        <SplitText text={title} as="span" stagger={0.04} />
         {highlight && (
-          <span style={{ color: 'var(--vistara-purple)', fontStyle: 'normal' }}> {highlight}</span>
+          <>
+            {' '}
+            <motion.span
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.45, delay: 0.12, ease: [0.16, 1, 0.3, 1] }}
+              style={{
+                color: dark ? 'var(--gold-soft)' : 'var(--vistara-purple)',
+                fontStyle: 'normal',
+                display: 'inline-block',
+              }}
+            >
+              {highlight}
+            </motion.span>
+          </>
         )}
       </h2>
       {subtitle && (
-        <p style={{ fontSize: '1rem', color: subColor, maxWidth: '600px', lineHeight: 1.7, ...(align === 'center' ? { margin: '0 auto' } : {}) }}>
+        <motion.p
+          initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
+          whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={{ duration: 0.45, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
+          style={{
+            fontSize: '1rem',
+            color: subColor,
+            maxWidth: '600px',
+            lineHeight: 1.7,
+            ...(align === 'center' ? { margin: '0 auto' } : {}),
+          }}
+        >
           {subtitle}
-        </p>
+        </motion.p>
       )}
       {children}
     </div>
@@ -94,9 +131,25 @@ interface CardProps {
   style?: CSSProperties;
   onClick?: () => void;
   as?: 'div' | 'article' | 'li';
+  interactive?: boolean;
 }
 
-export function Card({ children, dark = false, style, onClick, as: Tag = 'div' }: CardProps) {
+export function Card({
+  children,
+  dark = false,
+  style,
+  onClick,
+  as: Tag = 'div',
+  interactive = false,
+}: CardProps) {
+  if (interactive) {
+    return (
+      <TiltSpotlightCard dark={dark} style={style} onClick={onClick}>
+        {children}
+      </TiltSpotlightCard>
+    );
+  }
+
   return (
     <Tag
       className={dark ? 'card-dark' : 'card'}
@@ -134,17 +187,18 @@ export function Button({
   const sizeClass = size === 'sm' ? 'btn-sm' : size === 'lg' ? 'btn-lg' : '';
 
   return (
-    <button
+    <motion.button
       id={id}
       type={type}
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel}
       className={`btn btn-${variant} ${sizeClass}`}
+      whileTap={disabled ? undefined : { scale: 0.96 }}
       style={{ opacity: disabled ? 0.6 : 1, pointerEvents: disabled ? 'none' : 'auto' }}
     >
       {children}
-    </button>
+    </motion.button>
   );
 }
 
@@ -159,7 +213,12 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
   return (
-    <div className="empty-state">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="empty-state"
+    >
       {icon && (
         <div className="empty-state-icon" aria-hidden="true">
           {icon}
@@ -169,12 +228,12 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
         {title}
       </h3>
       {description && (
-        <p style={{ fontSize: '0.875rem', color: 'var(--light-grey)', maxWidth: '400px' }}>
+        <p style={{ fontSize: '0.875rem', color: 'var(--mid-grey)', maxWidth: '400px' }}>
           {description}
         </p>
       )}
       {action}
-    </div>
+    </motion.div>
   );
 }
 
@@ -182,10 +241,10 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
 
 export function LoadingState() {
   return (
-    <div style={{ padding: '4rem 2rem', display: 'flex', justifyContent: 'center' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', width: '100%', maxWidth: '900px' }}>
+    <div style={{ padding: '3rem 1.25rem', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', width: '100%', maxWidth: '960px' }}>
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="skeleton" style={{ height: '200px', borderRadius: '12px' }} />
+          <div key={i} className="skeleton" style={{ height: '180px', borderRadius: '12px' }} />
         ))}
       </div>
     </div>
