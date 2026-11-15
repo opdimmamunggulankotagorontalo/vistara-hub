@@ -151,9 +151,6 @@ export default function Anggota() {
     setSearchQuery('');
   };
 
-  const activeInspectionUnit: AnggotaUnit | null =
-    selectedUnit !== 'all' ? selectedUnit : null;
-
   return (
     <div className="anggota-public-page">
       <style>{`
@@ -417,69 +414,8 @@ export default function Anggota() {
                     : selectedUnit)
               }
               onSelectNode={handleSelectTreeNode}
+              onSelectMember={(member) => setSelectedMember(member)}
             />
-
-            {/* Active Unit Summary Callout */}
-            {activeInspectionUnit && (
-              <div
-                style={{
-                  marginTop: '1rem',
-                  padding: '0.95rem 1.1rem',
-                  borderRadius: '12px',
-                  background: 'var(--ghost-purple)',
-                  border: '1px solid var(--pale-lilac)',
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.75rem',
-                }}
-              >
-                <div style={{ flex: '1 1 260px' }}>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-header)',
-                      fontSize: '0.7rem',
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.08em',
-                      color: ANGGOTA_UNIT_META[activeInspectionUnit].accentColor,
-                    }}
-                  >
-                    Fokus Unit Terpilih · {filteredMembers.length} Personel
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontWeight: 800,
-                      fontSize: '0.98rem',
-                      color: 'var(--deep-violet)',
-                      marginTop: '0.15rem',
-                    }}
-                  >
-                    {ANGGOTA_UNIT_META[activeInspectionUnit].label}
-                  </div>
-                  <p
-                    style={{
-                      fontSize: '0.82rem',
-                      color: 'var(--charcoal)',
-                      margin: '0.2rem 0 0',
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    {ANGGOTA_UNIT_META[activeInspectionUnit].description}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={resetFilter}
-                  className="btn btn-outline btn-sm"
-                  style={{ minHeight: '40px' }}
-                >
-                  Tampilkan Semua
-                </button>
-              </div>
-            )}
           </div>
 
           {/* ── Searchbar & Single-Line Scrollable Unit Filter Bar ── */}

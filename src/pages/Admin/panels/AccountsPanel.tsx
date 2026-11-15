@@ -66,7 +66,7 @@ export default function AccountsPanel({
 
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showStructureRef, setShowStructureRef] = useState(false);
 
   // Create form state (strictly free-text, without password minimum length)
@@ -128,6 +128,19 @@ export default function AccountsPanel({
     };
   }, []);
 
+  useEffect(() => {
+    if (!showCreateModal && !editingAccount && !resetTarget) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowCreateModal(false);
+        setEditingAccount(null);
+        setResetTarget(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showCreateModal, editingAccount, resetTarget]);
+
   const showSuccess = (msg: string) => {
     setFeedback(msg);
     setTimeout(() => setFeedback(''), 4000);
@@ -175,7 +188,7 @@ export default function AccountsPanel({
         mustChangePassword,
       });
       setAccounts((prev) => [...prev, created]);
-      setShowCreateForm(false);
+      setShowCreateModal(false);
       resetCreateForm();
       showSuccess(`Akun @${created.username} (${created.jabatan}) berhasil dibuat.`);
     } catch (err) {
@@ -305,6 +318,86 @@ export default function AccountsPanel({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <style>{`
+        .accounts-toolbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 0.75rem;
+        }
+        .accounts-toolbar-actions {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+        .accounts-card {
+          padding: 0.95rem 1rem;
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+        .accounts-card-actions {
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+          gap: 0.45rem;
+          flex-wrap: wrap;
+          padding-top: 0.7rem;
+          border-top: 1px solid #F0EAFA;
+        }
+        .accounts-action-btn {
+          min-height: 40px;
+          padding: 0 0.75rem;
+          border-radius: 9px;
+          border: 1px solid #D4BFEF;
+          background: #FFFFFF;
+          color: var(--deep-violet);
+          font-family: var(--font-header);
+          font-size: 0.78rem;
+          font-weight: 600;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.35rem;
+          white-space: nowrap;
+          cursor: pointer;
+        }
+        .accounts-action-btn-danger {
+          border-color: #FFCDD2;
+          background: #FFF5F5;
+          color: #C62828;
+        }
+        @media (max-width: 639px) {
+          .accounts-toolbar {
+            align-items: stretch;
+          }
+          .accounts-toolbar-actions {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.5rem;
+          }
+          .accounts-toolbar-actions > button {
+            width: 100%;
+            justify-content: center;
+            padding-left: 0.55rem !important;
+            padding-right: 0.55rem !important;
+          }
+          .accounts-card-actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.45rem;
+          }
+          .accounts-card-actions > .accounts-confirm-group {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.45rem;
+          }
+        }
+      `}</style>
+
       {/* Sync Diagnostics Strip */}
       {diagnostics && (
         <div
@@ -387,18 +480,18 @@ export default function AccountsPanel({
       </div>
 
       {/* Action Toolbar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div style={{ fontSize: '0.84rem', color: 'var(--mid-grey)' }}>
+      <div className="accounts-toolbar">
+        <div style={{ fontSize: '0.83rem', color: 'var(--mid-grey)', flex: '1 1 260px' }}>
           {isRootActor
-            ? 'Buat & ubah akun login pengurus OPDIM (username, password bebas panjang karakter, peran, dan jabatan).'
-            : 'Buat & ubah akun pengurus non-root OPDIM (username, password bebas panjang karakter, peran, dan jabatan).'}
+            ? 'Kelola akun login pengurus OPDIM (username, password bebas panjang karakter, peran, dan jabatan).'
+            : 'Kelola akun login pengurus non-root OPDIM (username, password, peran, dan jabatan).'}
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <div className="accounts-toolbar-actions">
           <button
             type="button"
             onClick={() => setShowStructureRef((v) => !v)}
             className="btn btn-outline btn-sm"
-            style={{ minHeight: '42px' }}
+            style={{ minHeight: '42px', whiteSpace: 'nowrap' }}
           >
             <Users size={15} />
             <span>Referensi Struktur</span>
@@ -407,18 +500,13 @@ export default function AccountsPanel({
           <button
             type="button"
             onClick={() => {
-              if (showCreateForm) {
-                setShowCreateForm(false);
-                resetCreateForm();
-              } else {
-                resetCreateForm();
-                setShowCreateForm(true);
-              }
+              resetCreateForm();
+              setShowCreateModal(true);
             }}
             className="btn btn-primary btn-sm"
-            style={{ minHeight: '42px' }}
+            style={{ minHeight: '42px', whiteSpace: 'nowrap' }}
           >
-            {showCreateForm ? <><X size={15} /> Tutup Form</> : <><UserPlus size={15} /> Buat Akun Pengurus</>}
+            <UserPlus size={15} /> <span>Buat Akun</span>
           </button>
         </div>
       </div>
@@ -441,7 +529,7 @@ export default function AccountsPanel({
           <div className="admin-form-grid-3" style={{ fontSize: '0.8rem', color: 'var(--charcoal)', lineHeight: 1.55 }}>
             <div style={{ background: 'white', padding: '0.75rem', borderRadius: '9px', border: '1px solid #E5DDF5' }}>
               <div style={{ fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.25rem' }}>
-                Pengurus Inti (Ketua & Sekretaris)
+                Pengurus Inti (Ketua &amp; Sekretaris)
               </div>
               <div>• Ketua OPDIM: Muhamad Aryansyah Thaib</div>
               <div>• Wakil Ketua: Khansa Salsabila Azzahra</div>
@@ -458,7 +546,7 @@ export default function AccountsPanel({
             </div>
             <div style={{ background: 'white', padding: '0.75rem', borderRadius: '9px', border: '1px solid #E5DDF5' }}>
               <div style={{ fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.25rem' }}>
-                Komisi 5 — Media & Humas
+                Komisi 5 — Media &amp; Humas
               </div>
               <div>• Ketua Komisi: Ihsan Abdussalam Ma&apos;ruf</div>
               <div>• Anggota: Rafika Devi Sekar Sari, Rafael Ahmad Baihaqih Djafara, Sulaiman Nul Ihza D. Hasan, Razwa Raihana Maabu</div>
@@ -487,169 +575,16 @@ export default function AccountsPanel({
         </div>
       )}
 
-      {/* Free-Text Create Account Form */}
-      {showCreateForm && (
-        <form
-          onSubmit={handleCreate}
-          className="admin-surface"
-          style={{ padding: '1.1rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}
-        >
-          <h3 style={{ fontSize: '1rem', color: 'var(--deep-violet)', margin: 0 }}>
-            Buat Akun Pengurus Baru
-          </h3>
-
-          {formError && (
-            <div style={{ fontSize: '0.82rem', color: '#C62828', fontWeight: 500 }}>
-              {formError}
-            </div>
-          )}
-
-          <div className="admin-form-grid-2">
-            <div>
-              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
-                Nama Lengkap Pengurus *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ketik nama lengkap pengurus..."
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                style={{ width: '100%', minHeight: '44px', padding: '0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem' }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
-                Jabatan Organisasi *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Contoh: Ketua OPDIM / Sekretaris / Ketua Komisi 4..."
-                value={jabatan}
-                onChange={(e) => setJabatan(e.target.value)}
-                style={{ width: '100%', minHeight: '44px', padding: '0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem' }}
-              />
-            </div>
-          </div>
-
-          <div className="admin-form-grid-3">
-            <div>
-              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
-                Hak Akses Divisi *
-              </label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as AdminRole)}
-                style={{ width: '100%', minHeight: '44px', padding: '0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem', background: 'white' }}
-              >
-                {assignableRoles.map((r) => (
-                  <option key={r} value={r}>
-                    {ADMIN_ROLES_META[r].label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
-                Username Login *
-              </label>
-              <input
-                type="text"
-                required
-                autoCapitalize="none"
-                placeholder="Contoh: ketua.opdim"
-                value={username}
-                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
-                style={{ width: '100%', minHeight: '44px', padding: '0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem', fontFamily: 'var(--font-mono)' }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
-                Password Awal *
-              </label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showCreatePassword ? 'text' : 'password'}
-                  required
-                  placeholder="Bebas panjang karakter..."
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{ width: '100%', minHeight: '44px', padding: '0.55rem 2.5rem 0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem' }}
-                />
-                <button
-                  type="button"
-                  aria-label={showCreatePassword ? 'Sembunyikan password' : 'Tampilkan password'}
-                  onClick={() => setShowCreatePassword((v) => !v)}
-                  style={{
-                    position: 'absolute',
-                    right: '0.25rem',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    width: '36px',
-                    height: '36px',
-                    border: 'none',
-                    background: 'transparent',
-                    color: 'var(--mid-grey)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {showCreatePassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '0.83rem', color: 'var(--charcoal)', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={mustChangePassword}
-              onChange={(e) => setMustChangePassword(e.target.checked)}
-              style={{ width: '17px', height: '17px', accentColor: 'var(--vistara-purple)' }}
-            />
-            <span>Paksa pengguna mengganti password saat login pertama kali</span>
-          </label>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-            <button
-              type="button"
-              onClick={() => {
-                setShowCreateForm(false);
-                resetCreateForm();
-              }}
-              className="btn btn-outline btn-sm"
-              style={{ minHeight: '44px' }}
-            >
-              Batal
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="btn btn-primary btn-sm"
-              style={{ minHeight: '44px' }}
-            >
-              {isSubmitting ? 'Membuat Akun...' : 'Simpan & Buat Akun'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Accounts List */}
+      {/* Accounts List (Zero-Pill Clean Cards + Responsive Mobile Grid Actions) */}
       {isLoading ? (
         <LoadingState />
       ) : accounts.length === 0 ? (
         <EmptyState
           title="Belum ada akun terdaftar"
-          description="Klik tombol 'Buat Akun Pengurus' untuk menambahkan akun login baru."
+          description="Klik tombol 'Buat Akun' untuk menambahkan akun login baru."
         />
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
           {accounts.map((acc) => {
             const isSelf = acc.id === currentAccountId;
             const isProtectedRoot = acc.role === 'root' && !isRootActor;
@@ -659,85 +594,84 @@ export default function AccountsPanel({
             return (
               <div
                 key={acc.id}
-                className="admin-surface"
-                style={{
-                  padding: '0.95rem 1.05rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.65rem',
-                  opacity: acc.isActive ? 1 : 0.72,
-                }}
+                className="admin-surface accounts-card"
+                style={{ opacity: acc.isActive ? 1 : 0.7 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  <div style={{ minWidth: 0, flex: '1 1 240px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '0.2rem' }}>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', fontWeight: 700, color: 'var(--vistara-purple)' }}>
-                        @{acc.username}
-                      </span>
-                      <span
-                        style={{
-                          padding: '0.18rem 0.55rem',
-                          borderRadius: '6px',
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                          background: acc.role === 'root' ? '#EDE6F8' : '#F5F0FC',
-                          color: 'var(--deep-violet)',
-                        }}
-                      >
-                        {roleInfo?.shortLabel || acc.role}
-                      </span>
-                      <span
-                        style={{
-                          padding: '0.18rem 0.55rem',
-                          borderRadius: '6px',
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                          background: acc.isActive ? '#E8F5E9' : '#FFEBEE',
-                          color: acc.isActive ? '#2E7D32' : '#C62828',
-                        }}
-                      >
-                        {acc.isActive ? 'Aktif' : 'Nonaktif'}
-                      </span>
-                      {acc.mustChangePassword && (
-                        <span
-                          style={{
-                            padding: '0.18rem 0.55rem',
-                            borderRadius: '6px',
-                            fontSize: '0.7rem',
-                            fontWeight: 700,
-                            background: '#FFF8E1',
-                            color: '#9A6700',
-                          }}
-                        >
-                          Wajib Ganti Password
-                        </span>
-                      )}
-                      {isSelf && (
-                        <span
-                          style={{
-                            padding: '0.18rem 0.55rem',
-                            borderRadius: '6px',
-                            fontSize: '0.7rem',
-                            fontWeight: 700,
-                            background: '#E3F2FD',
-                            color: '#1565C0',
-                          }}
-                        >
-                          Sesi Anda
-                        </span>
-                      )}
-                    </div>
+                <div style={{ minWidth: 0 }}>
+                  {/* Clean Unboxed Typographic Metadata Line */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '0.35rem',
+                      fontSize: '0.76rem',
+                      fontFamily: 'var(--font-header)',
+                      color: 'var(--mid-grey)',
+                      marginBottom: '0.22rem',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 700,
+                        color: 'var(--vistara-purple)',
+                      }}
+                    >
+                      @{acc.username}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span style={{ fontWeight: 700, color: 'var(--deep-violet)' }}>
+                      {roleInfo?.shortLabel || acc.role}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        color: acc.isActive ? '#2E7D32' : '#C62828',
+                      }}
+                    >
+                      {acc.isActive ? 'Aktif' : 'Nonaktif'}
+                    </span>
+                    {isSelf && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span style={{ fontWeight: 700, color: '#1565C0' }}>Sesi Anda</span>
+                      </>
+                    )}
+                    {acc.mustChangePassword && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span style={{ fontWeight: 700, color: '#9A6700' }}>Wajib Ganti PW</span>
+                      </>
+                    )}
+                  </div>
 
-                    <h3 style={{ fontSize: '0.98rem', fontWeight: 700, color: 'var(--deep-violet)', margin: 0 }}>
-                      {acc.fullName}
-                    </h3>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--mid-grey)', marginTop: '0.15rem' }}>
-                      {acc.jabatan} · Login terakhir: <span className="tabular-nums">{formatTimestamp(acc.lastLoginAt)}</span>
-                    </div>
+                  <h3
+                    style={{
+                      fontSize: '1rem',
+                      fontWeight: 800,
+                      color: 'var(--deep-violet)',
+                      margin: 0,
+                      lineHeight: 1.25,
+                    }}
+                  >
+                    {acc.fullName}
+                  </h3>
+                  <div
+                    style={{
+                      fontSize: '0.8rem',
+                      color: 'var(--mid-grey)',
+                      marginTop: '0.18rem',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {acc.jabatan} · Login terakhir:{' '}
+                    <span className="tabular-nums">{formatTimestamp(acc.lastLoginAt)}</span>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div className="accounts-card-actions">
                   {isProtectedRoot ? (
                     <span
                       style={{
@@ -748,7 +682,7 @@ export default function AccountsPanel({
                         color: 'var(--mid-grey)',
                         fontFamily: 'var(--font-header)',
                         fontWeight: 600,
-                        padding: '0.3rem 0.5rem',
+                        padding: '0.25rem 0',
                       }}
                     >
                       <Lock size={13} /> Dilindungi (Khusus Root)
@@ -758,8 +692,7 @@ export default function AccountsPanel({
                       <button
                         type="button"
                         onClick={() => openEditModal(acc)}
-                        className="btn btn-outline btn-sm"
-                        style={{ minHeight: '40px' }}
+                        className="accounts-action-btn"
                       >
                         <Pencil size={14} /> Edit Akun
                       </button>
@@ -767,10 +700,9 @@ export default function AccountsPanel({
                       <button
                         type="button"
                         onClick={() => openResetModal(acc)}
-                        className="btn btn-outline btn-sm"
-                        style={{ minHeight: '40px' }}
+                        className="accounts-action-btn"
                       >
-                        <KeyRound size={14} /> Reset Password
+                        <KeyRound size={14} /> Reset PW
                       </button>
 
                       {!isSelf && (
@@ -778,14 +710,13 @@ export default function AccountsPanel({
                           <button
                             type="button"
                             onClick={() => handleToggleActive(acc)}
-                            className="btn btn-outline btn-sm"
-                            style={{ minHeight: '40px' }}
+                            className="accounts-action-btn"
                           >
                             <Power size={14} /> {acc.isActive ? 'Nonaktifkan' : 'Aktifkan'}
                           </button>
 
                           {isConfirmingDelete ? (
-                            <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                            <div className="accounts-confirm-group" style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
                               <button
                                 type="button"
                                 onClick={() => handleConfirmDelete(acc)}
@@ -807,8 +738,7 @@ export default function AccountsPanel({
                               <button
                                 type="button"
                                 onClick={() => setConfirmDeleteId(null)}
-                                className="btn btn-outline btn-sm"
-                                style={{ minHeight: '40px' }}
+                                className="accounts-action-btn"
                               >
                                 Batal
                               </button>
@@ -818,21 +748,7 @@ export default function AccountsPanel({
                               type="button"
                               onClick={() => setConfirmDeleteId(acc.id)}
                               aria-label={`Hapus akun @${acc.username}`}
-                              style={{
-                                minHeight: '40px',
-                                padding: '0 0.7rem',
-                                borderRadius: '9px',
-                                border: '1px solid #FFCDD2',
-                                background: '#FFF5F5',
-                                color: '#C62828',
-                                fontFamily: 'var(--font-header)',
-                                fontSize: '0.8rem',
-                                fontWeight: 600,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.3rem',
-                                cursor: 'pointer',
-                              }}
+                              className="accounts-action-btn accounts-action-btn-danger"
                             >
                               <Trash2 size={14} /> Hapus
                             </button>
@@ -848,6 +764,207 @@ export default function AccountsPanel({
         </div>
       )}
 
+      {/* Create Account Popup Modal */}
+      {showCreateModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Buat Akun Pengurus Baru"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 90,
+            background: 'rgba(15, 10, 30, 0.55)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowCreateModal(false);
+              resetCreateForm();
+            }
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '520px',
+              maxHeight: '90dvh',
+              overflowY: 'auto',
+              background: 'white',
+              borderRadius: '16px',
+              border: '1px solid #E5DDF5',
+              padding: '1.25rem',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <div>
+                <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.72rem', fontWeight: 700, color: 'var(--vistara-purple)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Tambah Pengurus
+                </div>
+                <h3 style={{ fontSize: '1.08rem', color: 'var(--deep-violet)', margin: 0 }}>
+                  Buat Akun Pengurus Baru
+                </h3>
+              </div>
+              <button
+                type="button"
+                aria-label="Tutup popup buat akun"
+                onClick={() => {
+                  setShowCreateModal(false);
+                  resetCreateForm();
+                }}
+                style={{ width: '40px', height: '40px', borderRadius: '10px', border: '1px solid #E5DDF5', background: '#FAF8FF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {formError && (
+              <div style={{ fontSize: '0.82rem', color: '#C62828', marginBottom: '0.75rem', fontWeight: 500 }}>
+                {formError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
+                  Nama Lengkap Pengurus *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ketik nama lengkap pengurus..."
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  style={{ width: '100%', minHeight: '44px', padding: '0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
+                  Jabatan Organisasi *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Ketua OPDIM / Sekretaris / Ketua Komisi 4..."
+                  value={jabatan}
+                  onChange={(e) => setJabatan(e.target.value)}
+                  style={{ width: '100%', minHeight: '44px', padding: '0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem' }}
+                />
+              </div>
+
+              <div className="admin-form-grid-2">
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
+                    Hak Akses Divisi *
+                  </label>
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value as AdminRole)}
+                    style={{ width: '100%', minHeight: '44px', padding: '0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem', background: 'white' }}
+                  >
+                    {assignableRoles.map((r) => (
+                      <option key={r} value={r}>
+                        {ADMIN_ROLES_META[r].label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
+                    Username Login *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoCapitalize="none"
+                    placeholder="Contoh: ketua.opdim"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
+                    style={{ width: '100%', minHeight: '44px', padding: '0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem', fontFamily: 'var(--font-mono)' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: 'var(--deep-violet)', marginBottom: '0.3rem' }}>
+                  Password Awal *
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showCreatePassword ? 'text' : 'password'}
+                    required
+                    placeholder="Bebas panjang karakter..."
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={{ width: '100%', minHeight: '44px', padding: '0.55rem 2.5rem 0.55rem 0.8rem', borderRadius: '9px', border: '1px solid #D4BFEF', fontSize: '0.88rem' }}
+                  />
+                  <button
+                    type="button"
+                    aria-label={showCreatePassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                    onClick={() => setShowCreatePassword((v) => !v)}
+                    style={{
+                      position: 'absolute',
+                      right: '0.25rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: '36px',
+                      height: '36px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--mid-grey)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {showCreatePassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', fontSize: '0.83rem', color: 'var(--charcoal)', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={mustChangePassword}
+                  onChange={(e) => setMustChangePassword(e.target.checked)}
+                  style={{ width: '17px', height: '17px', accentColor: 'var(--vistara-purple)' }}
+                />
+                <span>Paksa pengguna mengganti password saat login pertama kali</span>
+              </label>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.25rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    resetCreateForm();
+                  }}
+                  className="btn btn-outline btn-sm"
+                  style={{ minHeight: '44px' }}
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="btn btn-primary btn-sm"
+                  style={{ minHeight: '44px' }}
+                >
+                  {isSubmitting ? 'Membuat Akun...' : 'Simpan & Buat Akun'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Edit Username / Nama / Jabatan / Peran / Password Modal */}
       {editingAccount && (
         <div
@@ -859,6 +976,7 @@ export default function AccountsPanel({
             inset: 0,
             zIndex: 90,
             background: 'rgba(15, 10, 30, 0.55)',
+            backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -872,10 +990,10 @@ export default function AccountsPanel({
             style={{
               width: '100%',
               maxWidth: '480px',
-              maxHeight: '90vh',
+              maxHeight: '90dvh',
               overflowY: 'auto',
               background: 'white',
-              borderRadius: '14px',
+              borderRadius: '16px',
               border: '1px solid #E5DDF5',
               padding: '1.25rem',
             }}
@@ -886,14 +1004,14 @@ export default function AccountsPanel({
                   @{editingAccount.username}
                 </div>
                 <h3 style={{ fontSize: '1.08rem', color: 'var(--deep-violet)', margin: 0 }}>
-                  Ubah Data & Kredensial Akun
+                  Ubah Data &amp; Kredensial Akun
                 </h3>
               </div>
               <button
                 type="button"
                 aria-label="Tutup"
                 onClick={() => setEditingAccount(null)}
-                style={{ width: '38px', height: '38px', borderRadius: '9px', border: '1px solid #E5DDF5', background: '#FAF8FF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                style={{ width: '40px', height: '40px', borderRadius: '10px', border: '1px solid #E5DDF5', background: '#FAF8FF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
                 <X size={16} />
               </button>
@@ -1035,6 +1153,7 @@ export default function AccountsPanel({
             inset: 0,
             zIndex: 90,
             background: 'rgba(15, 10, 30, 0.55)',
+            backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1049,7 +1168,7 @@ export default function AccountsPanel({
               width: '100%',
               maxWidth: '440px',
               background: 'white',
-              borderRadius: '14px',
+              borderRadius: '16px',
               border: '1px solid #E5DDF5',
               padding: '1.25rem',
             }}
@@ -1067,7 +1186,7 @@ export default function AccountsPanel({
                 type="button"
                 aria-label="Tutup"
                 onClick={() => setResetTarget(null)}
-                style={{ width: '38px', height: '38px', borderRadius: '9px', border: '1px solid #E5DDF5', background: '#FAF8FF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                style={{ width: '40px', height: '40px', borderRadius: '10px', border: '1px solid #E5DDF5', background: '#FAF8FF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
                 <X size={16} />
               </button>
