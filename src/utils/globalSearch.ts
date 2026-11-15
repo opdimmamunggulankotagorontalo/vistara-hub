@@ -1,5 +1,6 @@
 import { beritaData, eventData, programKerjaData } from '../data';
 import type { BeritaItem, EventItem, ProgramKerja } from '../types';
+import { richTextToPlainText } from './richText';
 
 export type SearchCategory = 'all' | 'berita' | 'event' | 'program';
 export type SearchResultType = 'berita' | 'event' | 'program';
@@ -84,12 +85,13 @@ function mapEventToResult(item: EventItem, score: number): SearchResultItem {
       : item.status === 'ongoing'
         ? 'Berlangsung'
         : 'Selesai';
+  const plainDescription = richTextToPlainText(item.description);
   return {
     id: `event-${item.id}`,
     type: 'event',
     typeLabel: 'Event',
     title: item.title,
-    subtitle: item.description,
+    subtitle: plainDescription,
     meta: `${formatShortDate(item.date)} · ${item.time} WITA · ${item.location}`,
     categoryLabel: `${item.category} · ${statusLabel}`,
     href: `/beranda/event?highlight=${encodeURIComponent(item.slug)}`,
@@ -178,14 +180,15 @@ export function searchGlobalContent(
 
   const matchedEvents: SearchResultItem[] = [];
   for (const item of sourceEvents) {
-    const combined = `${item.title} ${item.description} ${item.category} ${item.location} ${item.date} ${item.status}`;
+    const plainDesc = richTextToPlainText(item.description);
+    const combined = `${item.title} ${plainDesc} ${item.category} ${item.location} ${item.date} ${item.status}`;
     if (!matchesAllTerms(combined, terms)) continue;
 
     const score =
       scoreField(item.title, terms, 12) +
       scoreField(item.category, terms, 7) +
       scoreField(item.location, terms, 6) +
-      scoreField(item.description, terms, 4);
+      scoreField(plainDesc, terms, 4);
 
     matchedEvents.push(mapEventToResult(item, score));
   }

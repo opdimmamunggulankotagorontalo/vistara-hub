@@ -4,7 +4,7 @@ import { uploadOptimizedMedia } from '../../services/dataClient';
 
 interface MediaUploadFieldProps {
   label: string;
-  folder: 'berita' | 'galeri' | 'events' | 'arsip' | 'anggota';
+  folder: 'berita' | 'galeri' | 'events' | 'arsip' | 'anggota' | 'prestasi';
   mode?: 'image' | 'document';
   value: string;
   onChange: (url: string, meta?: { sizeText?: string }) => void;

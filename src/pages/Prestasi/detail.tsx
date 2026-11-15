@@ -4,6 +4,7 @@ import { ArrowLeft, Calendar, Building2, User, Trophy } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Badge, LoadingState } from '../../components/ui';
 import ShareButtons from '../../components/ui/ShareButtons';
+import RichTextRenderer from '../../components/ui/RichTextRenderer';
 import type { PrestasiItem } from '../../types';
 import { fetchPrestasiBySlug, subscribeToTableChanges } from '../../services/dataClient';
 import { ScrollReveal } from '../../components/motion/MotionPrimitives';
@@ -119,6 +120,26 @@ export default function PrestasiDetail() {
                 {item.title}
               </h1>
 
+              {item.thumbnail && (
+                <div
+                  style={{
+                    height: 'clamp(200px, 34vw, 320px)',
+                    borderRadius: '14px',
+                    overflow: 'hidden',
+                    marginBottom: '1.75rem',
+                    border: '1px solid var(--pale-lilac)',
+                    background: 'var(--ghost-purple)',
+                  }}
+                >
+                  <img
+                    src={item.thumbnail}
+                    alt={item.title}
+                    referrerPolicy="no-referrer"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                </div>
+              )}
+
               {/* Info Grid */}
               <div
                 style={{
@@ -163,21 +184,27 @@ export default function PrestasiDetail() {
                 </div>
               </div>
 
-              <div style={{ color: 'var(--charcoal)', lineHeight: 1.8, fontSize: '1rem', marginBottom: '2rem' }}>
-                <p style={{ marginBottom: '1rem' }}>
-                  Pencapaian ini merupakan bukti dedikasi, kerja keras, serta bimbingan intensif civitas akademika Madrasah Aliyah Muhammadiyah Unggulan Kota Gorontalo. Melalui pembinaan komprehensif dari OPDIM VISTARA Komisi 3 (Akademik & Prestasi), siswa didorong untuk mengasah kemampuan hingga tingkat tertinggi.
-                </p>
-                <p>
-                  Semoga prestasi membanggakan ini menjadi inspirasi dan pemantik semangat bagi seluruh kader pelajar MAM Unggulan untuk terus berkarya, berkompetisi, dan mengharumkan nama almamater di kancah daerah maupun nasional.
-                </p>
+              <div style={{ marginBottom: '2rem' }}>
+                {item.description && item.description.trim() ? (
+                  <RichTextRenderer content={item.description} />
+                ) : (
+                  <div style={{ color: 'var(--charcoal)', lineHeight: 1.8, fontSize: '1rem' }}>
+                    <p style={{ marginBottom: '1rem' }}>
+                      Pencapaian ini merupakan bukti dedikasi, kerja keras, serta bimbingan intensif civitas akademika Madrasah Aliyah Muhammadiyah Unggulan Kota Gorontalo. Melalui pembinaan komprehensif OPDIM VISTARA, siswa didorong untuk mengasah potensi hingga tingkat tertinggi.
+                    </p>
+                    <p>
+                      Semoga prestasi membanggakan ini menjadi inspirasi dan pemantik semangat bagi seluruh kader pelajar MAM Unggulan untuk terus berkarya, berkompetisi, dan mengharumkan nama almamater di kancah daerah maupun nasional.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div
                 style={{
-                  borderLeft: '4px solid var(--gold-accent)',
-                  padding: '1.25rem 1.5rem',
-                  background: 'linear-gradient(135deg, rgba(201, 168, 76, 0.08), rgba(107, 63, 160, 0.05))',
-                  borderRadius: '0 12px 12px 0',
+                  border: '1px solid rgba(201, 168, 76, 0.35)',
+                  padding: '1.15rem 1.35rem',
+                  background: 'linear-gradient(135deg, rgba(201, 168, 76, 0.08), rgba(107, 63, 160, 0.04))',
+                  borderRadius: '12px',
                   fontStyle: 'italic',
                   color: 'var(--deep-violet)',
                   fontWeight: 500,

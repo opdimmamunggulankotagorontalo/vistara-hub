@@ -7,9 +7,13 @@ import {
   ChevronDown,
   ChevronRight,
   GitBranch,
+  ChevronsDownUp,
+  ChevronsUpDown,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { ANGGOTA_UNIT_META } from '../../data/anggotaSeed';
 import type { AnggotaOpdim, AnggotaUnit } from '../../types';
+import { useMotionSystem } from '../motion/MotionProvider';
 
 export type OrgTreeNodeKey =
   | 'kepala_madrasah'
@@ -31,8 +35,9 @@ interface OrgStructureCanvasProps {
 const KOMISI_UNITS = ['komisi1', 'komisi2', 'komisi3', 'komisi4', 'komisi5'] as const;
 const KOMISI_CENTERS = [77, 244, 410, 576, 743] as const;
 const BOARD_WIDTH = 860;
-const MIN_SCALE = 0.36;
+const MIN_SCALE = 0.3;
 const MAX_SCALE = 2.2;
+const BRANCH_EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 function clamp(val: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, val));
@@ -68,13 +73,30 @@ interface MemberLeafCardProps {
   accentColor: string;
   isLeader?: boolean;
   onClick?: () => void;
+  index?: number;
+  reducedMotion?: boolean;
 }
 
-function MemberLeafCard({ member, accentColor, isLeader = false, onClick }: MemberLeafCardProps) {
+function MemberLeafCard({
+  member,
+  accentColor,
+  isLeader = false,
+  onClick,
+  index = 0,
+  reducedMotion = false,
+}: MemberLeafCardProps) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
+      initial={reducedMotion ? false : { opacity: 0, y: 10, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={reducedMotion ? undefined : { opacity: 0, y: -6, scale: 0.96 }}
+      transition={{
+        duration: 0.24,
+        delay: reducedMotion ? 0 : Math.min(index * 0.04, 0.2),
+        ease: BRANCH_EASE,
+      }}
       style={{
         width: '100%',
         textAlign: 'left',
@@ -87,7 +109,6 @@ function MemberLeafCard({ member, accentColor, isLeader = false, onClick }: Memb
         gap: '9px',
         cursor: onClick ? 'pointer' : 'default',
         boxShadow: '0 3px 10px rgba(46, 26, 71, 0.04)',
-        transition: 'transform 160ms ease, border-color 160ms ease',
       }}
     >
       {member.fotoUrl ? (
@@ -159,7 +180,223 @@ function MemberLeafCard({ member, accentColor, isLeader = false, onClick }: Memb
           {member.fullName}
         </div>
       </div>
-    </button>
+    </motion.button>
+  );
+}
+
+interface KomisiBranchBlockProps {
+  unitKey: (typeof KOMISI_UNITS)[number];
+  sourceX: number;
+  members: AnggotaOpdim[];
+  onSelectMember?: (member: AnggotaOpdim) => void;
+  reducedMotion: boolean;
+  showSourceConnector?: boolean;
+}
+
+function KomisiBranchBlock({
+  unitKey,
+  sourceX,
+  members,
+  onSelectMember,
+  reducedMotion,
+  showSourceConnector = true,
+}: KomisiBranchBlockProps) {
+  const meta = ANGGOTA_UNIT_META[unitKey];
+  const unitMembers = members
+    .filter((m) => m.unit === unitKey)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  if (unitMembers.length === 0) return null;
+
+  const leader = unitMembers.find((m) => m.peranLevel === 'ketua_komisi') || unitMembers[0];
+  const restMembers = leader ? unitMembers.filter((m) => m.id !== leader.id) : unitMembers;
+  const branchRowItems = restMembers.slice(0, 5);
+  const extraItems = restMembers.slice(5);
+  const branchCenters = getDistributionCenters(branchRowItems.length, 820);
+
+  return (
+    <div
+      data-testid={`expanded-root-${unitKey}`}
+      style={{
+        width: '820px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+      }}
+    >
+      {/* Stem from clicked Komisi box horizontally to center */}
+      {showSourceConnector ? (
+        <motion.svg
+          width="820"
+          height="40"
+          viewBox="0 0 820 40"
+          aria-hidden="true"
+          initial={reducedMotion ? false : { opacity: 0, scaleY: 0 }}
+          animate={{ opacity: 1, scaleY: 1 }}
+          transition={{ duration: 0.25, ease: BRANCH_EASE }}
+          style={{ display: 'block', overflow: 'visible', transformOrigin: 'top center' }}
+        >
+          <line
+            x1={sourceX}
+            y1="0"
+            x2={sourceX}
+            y2="20"
+            stroke={meta.accentColor}
+            strokeWidth="2.4"
+          />
+          {sourceX !== 410 && (
+            <line
+              x1={sourceX}
+              y1="20"
+              x2="410"
+              y2="20"
+              stroke={meta.accentColor}
+              strokeWidth="2.4"
+            />
+          )}
+          <line
+            x1="410"
+            y1="20"
+            x2="410"
+            y2="40"
+            stroke={meta.accentColor}
+            strokeWidth="2.4"
+          />
+        </motion.svg>
+      ) : (
+        <motion.div
+          aria-hidden="true"
+          initial={reducedMotion ? false : { opacity: 0, scaleY: 0 }}
+          animate={{ opacity: 1, scaleY: 1 }}
+          transition={{ duration: 0.22, ease: BRANCH_EASE }}
+          style={{
+            width: '2.4px',
+            height: '22px',
+            background: meta.accentColor,
+            transformOrigin: 'top center',
+          }}
+        />
+      )}
+
+      {/* Komisi Root Header Label */}
+      <div
+        style={{
+          fontFamily: 'var(--font-header)',
+          fontSize: '11px',
+          fontWeight: 700,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          color: meta.accentColor,
+          marginBottom: '8px',
+        }}
+      >
+        Akar Struktur {meta.shortLabel} · {meta.label.replace(`${meta.shortLabel} — `, '')} · {unitMembers.length} Personel
+      </div>
+
+      {/* Leader Root Card */}
+      {leader && (
+        <div style={{ width: '280px' }}>
+          <MemberLeafCard
+            member={leader}
+            accentColor={meta.accentColor}
+            isLeader
+            index={0}
+            reducedMotion={reducedMotion}
+            onClick={onSelectMember ? () => onSelectMember(leader) : undefined}
+          />
+        </div>
+      )}
+
+      {/* Branching SVG Root Lines to Anggota Komisi */}
+      {branchRowItems.length > 0 && (
+        <>
+          <motion.svg
+            width="820"
+            height="30"
+            viewBox="0 0 820 30"
+            aria-hidden="true"
+            initial={reducedMotion ? false : { opacity: 0, scaleY: 0 }}
+            animate={{ opacity: 1, scaleY: 1 }}
+            transition={{ duration: 0.24, delay: reducedMotion ? 0 : 0.06, ease: BRANCH_EASE }}
+            style={{ display: 'block', overflow: 'visible', transformOrigin: 'top center' }}
+          >
+            <line
+              x1="410"
+              y1="0"
+              x2="410"
+              y2="15"
+              stroke={meta.accentColor}
+              strokeWidth="2.2"
+            />
+            {branchCenters.length > 1 && (
+              <line
+                x1={branchCenters[0]}
+                y1="15"
+                x2={branchCenters[branchCenters.length - 1]}
+                y2="15"
+                stroke={meta.accentColor}
+                strokeWidth="2.2"
+              />
+            )}
+            {branchCenters.map((cx) => (
+              <line
+                key={cx}
+                x1={cx}
+                y1="15"
+                x2={cx}
+                y2="30"
+                stroke={meta.accentColor}
+                strokeWidth="2.2"
+              />
+            ))}
+          </motion.svg>
+
+          <div
+            style={{
+              width: '820px',
+              display: 'grid',
+              gridTemplateColumns: `repeat(${branchRowItems.length}, minmax(0, 1fr))`,
+              gap: '10px',
+            }}
+          >
+            {branchRowItems.map((member, idx) => (
+              <MemberLeafCard
+                key={member.id}
+                member={member}
+                accentColor={meta.accentColor}
+                index={idx + 1}
+                reducedMotion={reducedMotion}
+                onClick={onSelectMember ? () => onSelectMember(member) : undefined}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Overflow row if >5 members in a commission */}
+      {extraItems.length > 0 && (
+        <div
+          style={{
+            width: '820px',
+            display: 'grid',
+            gridTemplateColumns: `repeat(${Math.min(extraItems.length, 5)}, minmax(0, 1fr))`,
+            gap: '10px',
+            marginTop: '10px',
+          }}
+        >
+          {extraItems.map((member, idx) => (
+            <MemberLeafCard
+              key={member.id}
+              member={member}
+              accentColor={meta.accentColor}
+              index={idx + 6}
+              reducedMotion={reducedMotion}
+              onClick={onSelectMember ? () => onSelectMember(member) : undefined}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -169,6 +406,7 @@ export default function OrgStructureCanvas({
   onSelectNode,
   onSelectMember,
 }: OrgStructureCanvasProps) {
+  const { reducedMotion } = useMotionSystem();
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
 
@@ -176,6 +414,7 @@ export default function OrgStructureCanvas({
   const [fitScale, setFitScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 12 });
   const [isDragging, setIsDragging] = useState(false);
+  const [expandAll, setExpandAll] = useState(false);
 
   const gestureRef = useRef<{
     mode: 'none' | 'pan' | 'pinch';
@@ -203,9 +442,10 @@ export default function OrgStructureCanvas({
 
   const suppressClickUntilRef = useRef(0);
 
-  const computeCenteredReset = (containerWidth: number) => {
+  const computeCenteredReset = (containerWidth: number, targetScaleFactor = 1) => {
     const usableW = Math.max(containerWidth - 24, 260);
-    const nextFit = clamp(Number((usableW / BOARD_WIDTH).toFixed(2)), MIN_SCALE, 1);
+    const baseFit = clamp(Number((usableW / BOARD_WIDTH).toFixed(2)), MIN_SCALE, 1);
+    const nextFit = clamp(Number((baseFit * targetScaleFactor).toFixed(2)), MIN_SCALE, 1);
     const centeredX = Math.round((containerWidth - BOARD_WIDTH * nextFit) / 2);
     return { nextFit, centeredX };
   };
@@ -277,39 +517,29 @@ export default function OrgStructureCanvas({
     return KOMISI_UNITS.indexOf(selectedNode as (typeof KOMISI_UNITS)[number]);
   }, [selectedNode]);
 
-  const expandedKomisiData = useMemo(() => {
-    if (selectedKomisiIndex < 0) return null;
-    const unitKey = KOMISI_UNITS[selectedKomisiIndex];
-    const meta = ANGGOTA_UNIT_META[unitKey];
-    const unitMembers = members
-      .filter((m) => m.unit === unitKey)
-      .sort((a, b) => a.sortOrder - b.sortOrder);
-    const leader =
-      unitMembers.find((m) => m.peranLevel === 'ketua_komisi') || unitMembers[0] || null;
-    const restMembers = leader
-      ? unitMembers.filter((m) => m.id !== leader.id)
-      : unitMembers;
-    return {
-      unitKey,
-      meta,
-      sourceX: KOMISI_CENTERS[selectedKomisiIndex],
-      leader,
-      restMembers,
-      total: unitMembers.length,
-    };
-  }, [members, selectedKomisiIndex]);
-
-  const handleReset = () => {
+  const handleReset = (scaleMultiplier = 1) => {
     const el = viewportRef.current;
     if (!el) {
       setScale(fitScale);
       setOffset({ x: 0, y: 14 });
       return;
     }
-    const { nextFit, centeredX } = computeCenteredReset(el.getBoundingClientRect().width);
+    const { nextFit, centeredX } = computeCenteredReset(
+      el.getBoundingClientRect().width,
+      scaleMultiplier
+    );
     setFitScale(nextFit);
     setScale(nextFit);
     setOffset({ x: centeredX, y: 14 });
+  };
+
+  const handleToggleExpandAll = () => {
+    const next = !expandAll;
+    setExpandAll(next);
+    // Adjust scale smoothly so the expanded full-tree sits neatly on desktop/mobile
+    requestAnimationFrame(() => {
+      handleReset(next ? 0.78 : 1);
+    });
   };
 
   const handleZoomStep = (delta: number) => {
@@ -464,6 +694,9 @@ export default function OrgStructureCanvas({
 
   const handleNodeClick = (node: OrgTreeNodeKey) => {
     if (Date.now() < suppressClickUntilRef.current) return;
+    if (expandAll) {
+      setExpandAll(false);
+    }
     onSelectNode(node);
   };
 
@@ -474,13 +707,14 @@ export default function OrgStructureCanvas({
 
   const zoomPercent = Math.round(scale * 100);
   const intiCenters = getDistributionCenters(Math.min(intiMembers.length, 5), 820);
-  const komisiBranchRowItems = expandedKomisiData?.restMembers.slice(0, 5) || [];
-  const komisiExtraItems = expandedKomisiData?.restMembers.slice(5) || [];
-  const komisiBranchCenters = getDistributionCenters(komisiBranchRowItems.length, 820);
+
+  const showKepalaBranch = (expandAll || selectedNode === 'kepala_madrasah') && Boolean(kepalaMadrasah);
+  const showPembinaBranch = (expandAll || selectedNode === 'pembina') && Boolean(pembinaOpdim);
+  const showIntiBranch = (expandAll || selectedNode === 'inti') && intiMembers.length > 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-      {/* Top Toolbar: Zoom Controls & Gesture Hint */}
+      {/* Top Toolbar: Expand All Toggle + Zoom Controls */}
       <div
         style={{
           display: 'flex',
@@ -506,89 +740,124 @@ export default function OrgStructureCanvas({
 
         <div
           style={{
-            display: 'inline-flex',
+            display: 'flex',
+            flexWrap: 'wrap',
             alignItems: 'center',
-            gap: '0.35rem',
-            background: '#FAF8FF',
-            border: '1px solid #E5DDF5',
-            borderRadius: '10px',
-            padding: '0.2rem',
+            gap: '0.45rem',
           }}
         >
           <button
             type="button"
-            aria-label="Perkecil bagan struktur"
-            onClick={() => handleZoomStep(-0.18)}
+            onClick={handleToggleExpandAll}
+            aria-pressed={expandAll}
             style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              border: 'none',
-              background: 'white',
-              color: 'var(--deep-violet)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            <ZoomOut size={16} />
-          </button>
-          <span
-            className="tabular-nums"
-            style={{
-              minWidth: '46px',
-              textAlign: 'center',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.76rem',
-              fontWeight: 700,
-              color: 'var(--deep-violet)',
-            }}
-          >
-            {zoomPercent}%
-          </span>
-          <button
-            type="button"
-            aria-label="Perbesar bagan struktur"
-            onClick={() => handleZoomStep(0.18)}
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '8px',
-              border: 'none',
-              background: 'white',
-              color: 'var(--deep-violet)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            <ZoomIn size={16} />
-          </button>
-          <button
-            type="button"
-            aria-label="Reset ukuran bagan"
-            onClick={handleReset}
-            style={{
-              height: '36px',
-              padding: '0 0.65rem',
-              borderRadius: '8px',
-              border: 'none',
-              background: 'white',
-              color: 'var(--vistara-purple)',
+              height: '40px',
+              padding: '0 0.8rem',
+              borderRadius: '10px',
+              border: expandAll ? '1.5px solid var(--vistara-purple)' : '1px solid #DFD4F3',
+              background: expandAll ? 'var(--vistara-purple)' : '#FAF8FF',
+              color: expandAll ? '#FFFFFF' : 'var(--deep-violet)',
               fontFamily: 'var(--font-header)',
-              fontSize: '0.75rem',
+              fontSize: '0.77rem',
               fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {expandAll ? <ChevronsDownUp size={15} /> : <ChevronsUpDown size={15} />}
+            <span>{expandAll ? 'Tutup Semua Akar' : 'Buka Semua Akar'}</span>
+          </button>
+
+          <div
+            style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: '0.3rem',
-              cursor: 'pointer',
+              background: '#FAF8FF',
+              border: '1px solid #E5DDF5',
+              borderRadius: '10px',
+              padding: '0.2rem',
             }}
           >
-            <RotateCcw size={13} />
-            <span>Fit</span>
-          </button>
+            <button
+              type="button"
+              aria-label="Perkecil bagan struktur"
+              onClick={() => handleZoomStep(-0.18)}
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'white',
+                color: 'var(--deep-violet)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <ZoomOut size={16} />
+            </button>
+            <span
+              className="tabular-nums"
+              style={{
+                minWidth: '44px',
+                textAlign: 'center',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                color: 'var(--deep-violet)',
+              }}
+            >
+              {zoomPercent}%
+            </span>
+            <button
+              type="button"
+              aria-label="Perbesar bagan struktur"
+              onClick={() => handleZoomStep(0.18)}
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'white',
+                color: 'var(--deep-violet)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <ZoomIn size={16} />
+            </button>
+            <button
+              type="button"
+              aria-label="Reset ukuran bagan"
+              onClick={() => handleReset(expandAll ? 0.78 : 1)}
+              style={{
+                height: '36px',
+                padding: '0 0.65rem',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'white',
+                color: 'var(--vistara-purple)',
+                fontFamily: 'var(--font-header)',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <RotateCcw size={13} />
+              <span>Fit</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -608,8 +877,9 @@ export default function OrgStructureCanvas({
         style={{
           position: 'relative',
           width: '100%',
-          height:
-            selectedNode === 'kepala_madrasah' || selectedNode === 'pembina'
+          height: expandAll
+            ? 'clamp(540px, 85vw, 940px)'
+            : selectedNode === 'kepala_madrasah' || selectedNode === 'pembina'
               ? 'clamp(390px, 62vw, 600px)'
               : selectedNode
                 ? 'clamp(420px, 76vw, 780px)'
@@ -623,6 +893,7 @@ export default function OrgStructureCanvas({
           touchAction: 'none',
           userSelect: 'none',
           cursor: isDragging ? 'grabbing' : 'grab',
+          transition: reducedMotion ? undefined : 'height 280ms cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
         {/* Scaled & Panned Diagram Layer */}
@@ -635,7 +906,7 @@ export default function OrgStructureCanvas({
             width: `${BOARD_WIDTH}px`,
             transformOrigin: '0 0',
             transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`,
-            padding: '18px 20px 30px',
+            padding: '18px 20px 36px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -645,20 +916,18 @@ export default function OrgStructureCanvas({
           <button
             type="button"
             onClick={() => handleNodeClick('kepala_madrasah')}
-            aria-pressed={selectedNode === 'kepala_madrasah'}
+            aria-pressed={selectedNode === 'kepala_madrasah' || expandAll}
             style={{
               width: '360px',
               textAlign: 'left',
               padding: '13px 16px',
               borderRadius: '14px',
               border:
-                selectedNode === 'kepala_madrasah'
+                selectedNode === 'kepala_madrasah' || expandAll
                   ? '2px solid #C9A84C'
                   : '1.5px solid rgba(201, 168, 76, 0.55)',
               background:
-                selectedNode === 'kepala_madrasah'
-                  ? '#FFF6DE'
-                  : '#FFFDF7',
+                selectedNode === 'kepala_madrasah' || expandAll ? '#FFF6DE' : '#FFFDF7',
               cursor: 'pointer',
               boxShadow: '0 4px 14px rgba(46, 26, 71, 0.05)',
             }}
@@ -683,7 +952,7 @@ export default function OrgStructureCanvas({
               >
                 Penanggung Jawab Tertinggi · Pimpinan
               </span>
-              {selectedNode === 'kepala_madrasah' ? (
+              {showKepalaBranch ? (
                 <ChevronDown size={14} style={{ color: '#8A6812' }} />
               ) : (
                 <ChevronRight size={14} style={{ color: '#B29237' }} />
@@ -705,20 +974,36 @@ export default function OrgStructureCanvas({
             </div>
           </button>
 
-          {/* Expanded Root Detail for Kepala Madrasah */}
-          {selectedNode === 'kepala_madrasah' && kepalaMadrasah && (
-            <div style={{ width: '360px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div aria-hidden="true" style={{ width: '2px', height: '16px', background: '#C9A84C' }} />
-              <div style={{ width: '100%' }}>
-                <MemberLeafCard
-                  member={kepalaMadrasah}
-                  accentColor="#9A7214"
-                  isLeader
-                  onClick={onSelectMember ? () => handleMemberCardClick(kepalaMadrasah) : undefined}
-                />
-              </div>
-            </div>
-          )}
+          {/* Animated Expanded Root Detail for Kepala Madrasah */}
+          <AnimatePresence initial={false}>
+            {showKepalaBranch && kepalaMadrasah && (
+              <motion.div
+                key="root-kepala"
+                initial={reducedMotion ? false : { opacity: 0, y: -8, scaleY: 0.92 }}
+                animate={{ opacity: 1, y: 0, scaleY: 1 }}
+                exit={reducedMotion ? undefined : { opacity: 0, y: -6, scaleY: 0.92 }}
+                transition={{ duration: 0.24, ease: BRANCH_EASE }}
+                style={{
+                  width: '360px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  transformOrigin: 'top center',
+                }}
+              >
+                <div aria-hidden="true" style={{ width: '2px', height: '16px', background: '#C9A84C' }} />
+                <div style={{ width: '100%' }}>
+                  <MemberLeafCard
+                    member={kepalaMadrasah}
+                    accentColor="#9A7214"
+                    isLeader
+                    reducedMotion={reducedMotion}
+                    onClick={onSelectMember ? () => handleMemberCardClick(kepalaMadrasah) : undefined}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Vertical Line */}
           <div aria-hidden="true" style={{ width: '2px', height: '22px', background: '#CBB8EB' }} />
@@ -727,17 +1012,17 @@ export default function OrgStructureCanvas({
           <button
             type="button"
             onClick={() => handleNodeClick('pembina')}
-            aria-pressed={selectedNode === 'pembina'}
+            aria-pressed={selectedNode === 'pembina' || expandAll}
             style={{
               width: '360px',
               textAlign: 'left',
               padding: '13px 16px',
               borderRadius: '14px',
               border:
-                selectedNode === 'pembina'
+                selectedNode === 'pembina' || expandAll
                   ? '2px solid var(--royal-purple)'
                   : '1.5px solid #D4BFEF',
-              background: selectedNode === 'pembina' ? '#F3ECFD' : '#FFFFFF',
+              background: selectedNode === 'pembina' || expandAll ? '#F3ECFD' : '#FFFFFF',
               cursor: 'pointer',
               boxShadow: '0 4px 14px rgba(46, 26, 71, 0.05)',
             }}
@@ -762,7 +1047,7 @@ export default function OrgStructureCanvas({
               >
                 Pembimbing Teknis &amp; Pengarah
               </span>
-              {selectedNode === 'pembina' ? (
+              {showPembinaBranch ? (
                 <ChevronDown size={14} style={{ color: 'var(--royal-purple)' }} />
               ) : (
                 <ChevronRight size={14} style={{ color: 'var(--vistara-purple)' }} />
@@ -784,20 +1069,36 @@ export default function OrgStructureCanvas({
             </div>
           </button>
 
-          {/* Expanded Root Detail for Pembina */}
-          {selectedNode === 'pembina' && pembinaOpdim && (
-            <div style={{ width: '360px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div aria-hidden="true" style={{ width: '2px', height: '16px', background: '#7C4DFF' }} />
-              <div style={{ width: '100%' }}>
-                <MemberLeafCard
-                  member={pembinaOpdim}
-                  accentColor="#6B3FA0"
-                  isLeader
-                  onClick={onSelectMember ? () => handleMemberCardClick(pembinaOpdim) : undefined}
-                />
-              </div>
-            </div>
-          )}
+          {/* Animated Expanded Root Detail for Pembina */}
+          <AnimatePresence initial={false}>
+            {showPembinaBranch && pembinaOpdim && (
+              <motion.div
+                key="root-pembina"
+                initial={reducedMotion ? false : { opacity: 0, y: -8, scaleY: 0.92 }}
+                animate={{ opacity: 1, y: 0, scaleY: 1 }}
+                exit={reducedMotion ? undefined : { opacity: 0, y: -6, scaleY: 0.92 }}
+                transition={{ duration: 0.24, ease: BRANCH_EASE }}
+                style={{
+                  width: '360px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  transformOrigin: 'top center',
+                }}
+              >
+                <div aria-hidden="true" style={{ width: '2px', height: '16px', background: '#7C4DFF' }} />
+                <div style={{ width: '100%' }}>
+                  <MemberLeafCard
+                    member={pembinaOpdim}
+                    accentColor="#6B3FA0"
+                    isLeader
+                    reducedMotion={reducedMotion}
+                    onClick={onSelectMember ? () => handleMemberCardClick(pembinaOpdim) : undefined}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Vertical Line */}
           <div aria-hidden="true" style={{ width: '2px', height: '22px', background: '#CBB8EB' }} />
@@ -806,21 +1107,21 @@ export default function OrgStructureCanvas({
           <button
             type="button"
             onClick={() => handleNodeClick('inti')}
-            aria-pressed={selectedNode === 'inti'}
+            aria-pressed={selectedNode === 'inti' || expandAll}
             style={{
               width: '450px',
               textAlign: 'left',
               padding: '14px 18px',
               borderRadius: '14px',
               border:
-                selectedNode === 'inti'
+                selectedNode === 'inti' || expandAll
                   ? '2px solid var(--deep-violet)'
                   : '1.5px solid rgba(46, 26, 71, 0.35)',
               background:
-                selectedNode === 'inti'
+                selectedNode === 'inti' || expandAll
                   ? 'linear-gradient(135deg, var(--deep-violet), var(--royal-purple))'
                   : '#FFFFFF',
-              color: selectedNode === 'inti' ? '#FFFFFF' : 'var(--deep-violet)',
+              color: selectedNode === 'inti' || expandAll ? '#FFFFFF' : 'var(--deep-violet)',
               cursor: 'pointer',
               boxShadow: '0 6px 18px rgba(46, 26, 71, 0.07)',
             }}
@@ -840,7 +1141,10 @@ export default function OrgStructureCanvas({
                   fontWeight: 700,
                   letterSpacing: '0.09em',
                   textTransform: 'uppercase',
-                  color: selectedNode === 'inti' ? 'var(--gold-soft)' : 'var(--vistara-purple)',
+                  color:
+                    selectedNode === 'inti' || expandAll
+                      ? 'var(--gold-soft)'
+                      : 'var(--vistara-purple)',
                 }}
               >
                 Pengurus Inti OPDIM · {countsByUnit.inti} Personel
@@ -852,11 +1156,14 @@ export default function OrgStructureCanvas({
                   gap: '3px',
                   fontSize: '10.5px',
                   fontWeight: 700,
-                  color: selectedNode === 'inti' ? 'var(--gold-soft)' : 'var(--vistara-purple)',
+                  color:
+                    selectedNode === 'inti' || expandAll
+                      ? 'var(--gold-soft)'
+                      : 'var(--vistara-purple)',
                 }}
               >
                 <GitBranch size={12} />
-                {selectedNode === 'inti' ? 'Tutup Akar' : 'Lihat Akar'}
+                {showIntiBranch ? 'Akar Terbuka' : 'Lihat Akar'}
               </span>
             </div>
             <div
@@ -873,70 +1180,88 @@ export default function OrgStructureCanvas({
               style={{
                 fontSize: '12px',
                 marginTop: '3px',
-                color: selectedNode === 'inti' ? 'rgba(255,255,255,0.86)' : 'var(--mid-grey)',
+                color:
+                  selectedNode === 'inti' || expandAll
+                    ? 'rgba(255,255,255,0.86)'
+                    : 'var(--mid-grey)',
               }}
             >
               Ketua · Wakil Ketua · Sekretaris · Bendahara · Koordinator Lapangan
             </div>
           </button>
 
-          {/* Branching Root Tree for Pengurus Inti when selected */}
-          {selectedNode === 'inti' && intiMembers.length > 0 && (
-            <div
-              data-testid="expanded-root-inti"
-              style={{ width: '820px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
-            >
-              <svg
-                width="820"
-                height="28"
-                viewBox="0 0 820 28"
-                aria-hidden="true"
-                style={{ display: 'block', overflow: 'visible' }}
-              >
-                <line x1="410" y1="0" x2="410" y2="14" stroke="#7C4DFF" strokeWidth="2.2" />
-                {intiCenters.length > 1 && (
-                  <line
-                    x1={intiCenters[0]}
-                    y1="14"
-                    x2={intiCenters[intiCenters.length - 1]}
-                    y2="14"
-                    stroke="#7C4DFF"
-                    strokeWidth="2.2"
-                  />
-                )}
-                {intiCenters.map((cx) => (
-                  <line
-                    key={cx}
-                    x1={cx}
-                    y1="14"
-                    x2={cx}
-                    y2="28"
-                    stroke="#7C4DFF"
-                    strokeWidth="2.2"
-                  />
-                ))}
-              </svg>
-
-              <div
+          {/* Animated Branching Root Tree for Pengurus Inti */}
+          <AnimatePresence initial={false}>
+            {showIntiBranch && (
+              <motion.div
+                key="root-inti"
+                data-testid="expanded-root-inti"
+                initial={reducedMotion ? false : { opacity: 0, y: -10, scaleY: 0.92 }}
+                animate={{ opacity: 1, y: 0, scaleY: 1 }}
+                exit={reducedMotion ? undefined : { opacity: 0, y: -8, scaleY: 0.92 }}
+                transition={{ duration: 0.28, ease: BRANCH_EASE }}
                 style={{
                   width: '820px',
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${Math.min(intiMembers.length, 5)}, minmax(0, 1fr))`,
-                  gap: '10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  transformOrigin: 'top center',
                 }}
               >
-                {intiMembers.map((member, idx) => (
-                  <MemberLeafCard
-                    key={member.id}
-                    member={member}
-                    accentColor="#6B3FA0"
-                    isLeader={idx === 0}
-                    onClick={onSelectMember ? () => handleMemberCardClick(member) : undefined}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+                <svg
+                  width="820"
+                  height="28"
+                  viewBox="0 0 820 28"
+                  aria-hidden="true"
+                  style={{ display: 'block', overflow: 'visible' }}
+                >
+                  <line x1="410" y1="0" x2="410" y2="14" stroke="#7C4DFF" strokeWidth="2.2" />
+                  {intiCenters.length > 1 && (
+                    <line
+                      x1={intiCenters[0]}
+                      y1="14"
+                      x2={intiCenters[intiCenters.length - 1]}
+                      y2="14"
+                      stroke="#7C4DFF"
+                      strokeWidth="2.2"
+                    />
+                  )}
+                  {intiCenters.map((cx) => (
+                    <line
+                      key={cx}
+                      x1={cx}
+                      y1="14"
+                      x2={cx}
+                      y2="28"
+                      stroke="#7C4DFF"
+                      strokeWidth="2.2"
+                    />
+                  ))}
+                </svg>
+
+                <div
+                  style={{
+                    width: '820px',
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${Math.min(intiMembers.length, 5)}, minmax(0, 1fr))`,
+                    gap: '10px',
+                  }}
+                >
+                  {intiMembers.map((member, idx) => (
+                    <MemberLeafCard
+                      key={member.id}
+                      member={member}
+                      accentColor="#6B3FA0"
+                      isLeader={idx === 0}
+                      index={idx}
+                      reducedMotion={reducedMotion}
+                      onClick={onSelectMember ? () => handleMemberCardClick(member) : undefined}
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* SVG Connector Tree to 5 Komisi */}
           <svg
@@ -949,7 +1274,7 @@ export default function OrgStructureCanvas({
             <line x1="410" y1="0" x2="410" y2="16" stroke="#CBB8EB" strokeWidth="2" />
             <line x1="77" y1="16" x2="743" y2="16" stroke="#CBB8EB" strokeWidth="2" />
             {KOMISI_CENTERS.map((cx, i) => {
-              const isHighlighted = selectedKomisiIndex === i;
+              const isHighlighted = expandAll || selectedKomisiIndex === i;
               return (
                 <line
                   key={cx}
@@ -978,7 +1303,7 @@ export default function OrgStructureCanvas({
               const ketua = members.find(
                 (m) => m.unit === unitKey && m.peranLevel === 'ketua_komisi'
               );
-              const isActive = selectedNode === unitKey;
+              const isActive = expandAll || selectedNode === unitKey;
               return (
                 <button
                   key={unitKey}
@@ -1080,172 +1405,56 @@ export default function OrgStructureCanvas({
             })}
           </div>
 
-          {/* Tier 5: Branching Root Tree for Selected Komisi */}
-          {expandedKomisiData && (
-            <div
-              data-testid={`expanded-root-${expandedKomisiData.unitKey}`}
-              style={{
-                width: '820px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-              }}
-            >
-              {/* Stem from clicked Komisi box horizontally to center */}
-              <svg
-                width="820"
-                height="40"
-                viewBox="0 0 820 40"
-                aria-hidden="true"
-                style={{ display: 'block', overflow: 'visible' }}
-              >
-                <line
-                  x1={expandedKomisiData.sourceX}
-                  y1="0"
-                  x2={expandedKomisiData.sourceX}
-                  y2="20"
-                  stroke={expandedKomisiData.meta.accentColor}
-                  strokeWidth="2.4"
-                />
-                {expandedKomisiData.sourceX !== 410 && (
-                  <line
-                    x1={expandedKomisiData.sourceX}
-                    y1="20"
-                    x2="410"
-                    y2="20"
-                    stroke={expandedKomisiData.meta.accentColor}
-                    strokeWidth="2.4"
-                  />
-                )}
-                <line
-                  x1="410"
-                  y1="20"
-                  x2="410"
-                  y2="40"
-                  stroke={expandedKomisiData.meta.accentColor}
-                  strokeWidth="2.4"
-                />
-              </svg>
-
-              {/* Komisi Root Header Pill Label */}
-              <div
+          {/* Tier 5: Animated Branching Root Trees — Either ALL Komisi or Single Focused Komisi */}
+          <AnimatePresence mode="wait" initial={false}>
+            {expandAll ? (
+              <motion.div
+                key="all-komisi-roots"
+                data-testid="expanded-all-roots"
+                initial={reducedMotion ? false : { opacity: 0, y: -12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reducedMotion ? undefined : { opacity: 0, y: -10 }}
+                transition={{ duration: 0.3, ease: BRANCH_EASE }}
                 style={{
-                  fontFamily: 'var(--font-header)',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  color: expandedKomisiData.meta.accentColor,
-                  marginBottom: '8px',
+                  width: '820px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '18px',
+                  marginTop: '6px',
                 }}
               >
-                Akar Struktur {expandedKomisiData.meta.shortLabel} · {expandedKomisiData.total} Personel
-              </div>
-
-              {/* Leader Root Card */}
-              {expandedKomisiData.leader && (
-                <div style={{ width: '270px' }}>
-                  <MemberLeafCard
-                    member={expandedKomisiData.leader}
-                    accentColor={expandedKomisiData.meta.accentColor}
-                    isLeader
-                    onClick={
-                      onSelectMember
-                        ? () => handleMemberCardClick(expandedKomisiData.leader!)
-                        : undefined
-                    }
+                {KOMISI_UNITS.map((unitKey, idx) => (
+                  <KomisiBranchBlock
+                    key={unitKey}
+                    unitKey={unitKey}
+                    sourceX={KOMISI_CENTERS[idx]}
+                    members={members}
+                    onSelectMember={handleMemberCardClick}
+                    reducedMotion={reducedMotion}
+                    showSourceConnector={idx === 0}
                   />
-                </div>
-              )}
-
-              {/* Branching SVG Root Lines to Anggota Komisi */}
-              {komisiBranchRowItems.length > 0 && (
-                <>
-                  <svg
-                    width="820"
-                    height="30"
-                    viewBox="0 0 820 30"
-                    aria-hidden="true"
-                    style={{ display: 'block', overflow: 'visible' }}
-                  >
-                    <line
-                      x1="410"
-                      y1="0"
-                      x2="410"
-                      y2="15"
-                      stroke={expandedKomisiData.meta.accentColor}
-                      strokeWidth="2.2"
-                    />
-                    {komisiBranchCenters.length > 1 && (
-                      <line
-                        x1={komisiBranchCenters[0]}
-                        y1="15"
-                        x2={komisiBranchCenters[komisiBranchCenters.length - 1]}
-                        y2="15"
-                        stroke={expandedKomisiData.meta.accentColor}
-                        strokeWidth="2.2"
-                      />
-                    )}
-                    {komisiBranchCenters.map((cx) => (
-                      <line
-                        key={cx}
-                        x1={cx}
-                        y1="15"
-                        x2={cx}
-                        y2="30"
-                        stroke={expandedKomisiData.meta.accentColor}
-                        strokeWidth="2.2"
-                      />
-                    ))}
-                  </svg>
-
-                  <div
-                    style={{
-                      width: '820px',
-                      display: 'grid',
-                      gridTemplateColumns: `repeat(${komisiBranchRowItems.length}, minmax(0, 1fr))`,
-                      gap: '10px',
-                    }}
-                  >
-                    {komisiBranchRowItems.map((member) => (
-                      <MemberLeafCard
-                        key={member.id}
-                        member={member}
-                        accentColor={expandedKomisiData.meta.accentColor}
-                        onClick={
-                          onSelectMember ? () => handleMemberCardClick(member) : undefined
-                        }
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {/* Overflow row if >5 members in a commission */}
-              {komisiExtraItems.length > 0 && (
-                <div
-                  style={{
-                    width: '820px',
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${Math.min(komisiExtraItems.length, 5)}, minmax(0, 1fr))`,
-                    gap: '10px',
-                    marginTop: '10px',
-                  }}
-                >
-                  {komisiExtraItems.map((member) => (
-                    <MemberLeafCard
-                      key={member.id}
-                      member={member}
-                      accentColor={expandedKomisiData.meta.accentColor}
-                      onClick={
-                        onSelectMember ? () => handleMemberCardClick(member) : undefined
-                      }
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                ))}
+              </motion.div>
+            ) : selectedKomisiIndex >= 0 ? (
+              <motion.div
+                key={`komisi-root-${KOMISI_UNITS[selectedKomisiIndex]}`}
+                initial={reducedMotion ? false : { opacity: 0, y: -10, scaleY: 0.94 }}
+                animate={{ opacity: 1, y: 0, scaleY: 1 }}
+                exit={reducedMotion ? undefined : { opacity: 0, y: -8, scaleY: 0.94 }}
+                transition={{ duration: 0.26, ease: BRANCH_EASE }}
+                style={{ transformOrigin: 'top center' }}
+              >
+                <KomisiBranchBlock
+                  unitKey={KOMISI_UNITS[selectedKomisiIndex]}
+                  sourceX={KOMISI_CENTERS[selectedKomisiIndex]}
+                  members={members}
+                  onSelectMember={handleMemberCardClick}
+                  reducedMotion={reducedMotion}
+                />
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
       </div>
     </div>

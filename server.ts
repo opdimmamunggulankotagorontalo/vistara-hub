@@ -150,8 +150,23 @@ db.exec(`
     tahun TEXT NOT NULL,
     medali TEXT NOT NULL,
     penyelenggara TEXT NOT NULL,
+    description TEXT,
+    thumbnail TEXT,
     created_at INTEGER NOT NULL
   );
+`);
+
+// Idempotent column migration for existing SQLite databases
+const prestasiCols = db.prepare('PRAGMA table_info(prestasi)').all() as Array<{ name: string }>;
+const prestasiColNames = new Set(prestasiCols.map((c) => c.name));
+if (!prestasiColNames.has('description')) {
+  db.exec('ALTER TABLE prestasi ADD COLUMN description TEXT;');
+}
+if (!prestasiColNames.has('thumbnail')) {
+  db.exec('ALTER TABLE prestasi ADD COLUMN thumbnail TEXT;');
+}
+
+db.exec(`
 
   DROP TABLE IF EXISTS admin_roles;
 
@@ -1652,7 +1667,7 @@ async function startServer() {
   app.get('/api/prestasi', (_req, res) => {
     try {
       const rows = db
-        .prepare('SELECT id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara FROM prestasi ORDER BY tahun DESC, created_at DESC')
+        .prepare('SELECT id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara, description, thumbnail FROM prestasi ORDER BY tahun DESC, created_at DESC')
         .all();
       return res.json({ records: rows });
     } catch (error) {
@@ -1674,6 +1689,8 @@ async function startServer() {
       const medaliRaw = String(b.medali || 'juara1').trim().toLowerCase();
       const medali = VALID_PRESTASI_MEDALI.has(medaliRaw) ? medaliRaw : 'juara1';
       const penyelenggara = String(b.penyelenggara || '').trim();
+      const description = typeof b.description === 'string' && b.description.trim() ? b.description.trim() : null;
+      const thumbnail = typeof b.thumbnail === 'string' && b.thumbnail.trim() ? b.thumbnail.trim() : null;
 
       if (!title || !peraih || !penyelenggara) {
         return res.status(400).json({ error: 'Judul prestasi, peraih, dan penyelenggara wajib diisi.' });
@@ -1683,12 +1700,12 @@ async function startServer() {
       const slug = `${slugifyServer(title)}-${Math.floor(100 + Math.random() * 900)}`;
 
       db.prepare(`
-        INSERT INTO prestasi (id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara, Date.now());
+        INSERT INTO prestasi (id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara, description, thumbnail, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara, description, thumbnail, Date.now());
 
       const created = db
-        .prepare('SELECT id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara FROM prestasi WHERE id = ?')
+        .prepare('SELECT id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara, description, thumbnail FROM prestasi WHERE id = ?')
         .get(id);
       return res.status(201).json({ record: created });
     } catch (error) {
@@ -1711,6 +1728,8 @@ async function startServer() {
       const medaliRaw = String(b.medali || 'juara1').trim().toLowerCase();
       const medali = VALID_PRESTASI_MEDALI.has(medaliRaw) ? medaliRaw : 'juara1';
       const penyelenggara = String(b.penyelenggara || '').trim();
+      const description = typeof b.description === 'string' && b.description.trim() ? b.description.trim() : null;
+      const thumbnail = typeof b.thumbnail === 'string' && b.thumbnail.trim() ? b.thumbnail.trim() : null;
 
       if (!title || !peraih || !penyelenggara) {
         return res.status(400).json({ error: 'Judul prestasi, peraih, dan penyelenggara wajib diisi.' });
@@ -1718,12 +1737,12 @@ async function startServer() {
 
       db.prepare(`
         UPDATE prestasi
-        SET title = ?, tingkat = ?, kategori = ?, peraih = ?, tahun = ?, medali = ?, penyelenggara = ?
+        SET title = ?, tingkat = ?, kategori = ?, peraih = ?, tahun = ?, medali = ?, penyelenggara = ?, description = ?, thumbnail = ?
         WHERE id = ?
-      `).run(title, tingkat, kategori, peraih, tahun, medali, penyelenggara, id);
+      `).run(title, tingkat, kategori, peraih, tahun, medali, penyelenggara, description, thumbnail, id);
 
       const updated = db
-        .prepare('SELECT id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara FROM prestasi WHERE id = ?')
+        .prepare('SELECT id, slug, title, tingkat, kategori, peraih, tahun, medali, penyelenggara, description, thumbnail FROM prestasi WHERE id = ?')
         .get(id);
       return res.json({ record: updated });
     } catch (error) {

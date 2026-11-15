@@ -91,6 +91,7 @@ export interface PrestasiItem {
   tahun: string;
   medali: 'emas' | 'perak' | 'perunggu' | 'juara1' | 'juara2' | 'juara3' | 'peserta' | 'harapan';
   penyelenggara: string;
+  description?: string;
   thumbnail?: string;
 }
 

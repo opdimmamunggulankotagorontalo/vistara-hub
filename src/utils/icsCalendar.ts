@@ -1,4 +1,5 @@
 import type { EventItem } from '../types';
+import { richTextToPlainText } from './richText';
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
@@ -100,9 +101,10 @@ export function generateEventIcs(event: EventItem, dtStampDate = new Date()): st
   }
 
   lines.push(`SUMMARY:${escapeIcsText(event.title)}`);
+  const plainDescription = richTextToPlainText(event.description);
   lines.push(
     `DESCRIPTION:${escapeIcsText(
-      `${event.description}\n\nKategori: ${event.category} | Waktu: ${event.time} WITA — OPDIM VISTARA 2026–2027`
+      `${plainDescription}\n\nKategori: ${event.category} | Waktu: ${event.time} WITA — OPDIM VISTARA 2026–2027`
     )}`
   );
   lines.push(`LOCATION:${escapeIcsText(event.location)}`);

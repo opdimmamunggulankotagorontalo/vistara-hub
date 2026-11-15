@@ -136,8 +136,12 @@ CREATE TABLE IF NOT EXISTS public.prestasi (
   tahun TEXT NOT NULL,
   medali TEXT NOT NULL CHECK (medali IN ('emas', 'perak', 'perunggu', 'juara1', 'juara2', 'juara3', 'peserta')),
   penyelenggara TEXT NOT NULL,
+  description TEXT,
+  thumbnail TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE public.prestasi ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE public.prestasi ADD COLUMN IF NOT EXISTS thumbnail TEXT;
 
 -- 7b. Struktur Anggota OPDIM, Kepala Madrasah & Pembina
 CREATE TABLE IF NOT EXISTS public.anggota_opdim (

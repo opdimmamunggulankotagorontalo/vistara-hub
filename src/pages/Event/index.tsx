@@ -13,6 +13,7 @@ import {
 import { motion } from 'motion/react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Badge, EmptyState, LoadingState, StatusBadge } from '../../components/ui';
+import RichTextRenderer from '../../components/ui/RichTextRenderer';
 import type { EventItem } from '../../types';
 import { ScrollReveal } from '../../components/motion/MotionPrimitives';
 import { useMotionSystem } from '../../components/motion/MotionProvider';
@@ -295,16 +296,9 @@ export default function EventPage() {
                       >
                         {event.title}
                       </h2>
-                      <p
-                        style={{
-                          fontSize: '0.85rem',
-                          color: 'var(--mid-grey)',
-                          lineHeight: 1.5,
-                          marginBottom: '0.75rem',
-                        }}
-                      >
-                        {event.description}
-                      </p>
+                      <div style={{ marginBottom: '0.75rem' }}>
+                        <RichTextRenderer content={event.description} compact />
+                      </div>
                       <div
                         style={{
                           display: 'flex',

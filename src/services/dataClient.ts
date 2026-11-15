@@ -799,7 +799,7 @@ export async function deleteAdminAccount(accountId: string): Promise<void> {
 
 export async function uploadOptimizedMedia(
   file: File,
-  folder: 'berita' | 'galeri' | 'events' | 'arsip' | 'anggota'
+  folder: 'berita' | 'galeri' | 'events' | 'arsip' | 'anggota' | 'prestasi'
 ): Promise<UploadedMediaResult> {
   const isImage = file.type.startsWith('image/');
   let uploadBlob: Blob = file;
@@ -2243,29 +2243,50 @@ export async function fetchPrestasiBySlug(slug: string): Promise<PrestasiItem | 
   return list.find((p) => p.slug === slug);
 }
 
+function isMissingColumnError(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  const code = String(error.code || '').toUpperCase();
+  const msg = String(error.message || '').toLowerCase();
+  return (
+    code === '42703' ||
+    code === 'PGRST204' ||
+    msg.includes('column') ||
+    msg.includes('schema cache')
+  );
+}
+
 export async function createPrestasi(input: Omit<PrestasiItem, 'id' | 'slug'>): Promise<PrestasiItem> {
   if (supabase && isSupabaseConfigured) {
     try {
       const id = `prestasi-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
       const slug = `${slugifyText(input.title)}-${Math.floor(100 + Math.random() * 900)}`;
-      const { data, error } = await supabase
-        .from('prestasi')
-        .insert({
-          id,
-          slug,
-          title: input.title,
-          tingkat: input.tingkat,
-          kategori: input.kategori,
-          peraih: input.peraih,
-          tahun: input.tahun,
-          medali: input.medali,
-          penyelenggara: input.penyelenggara,
-        })
-        .select('*')
-        .single();
-      if (!error && data) {
+      const baseRow = {
+        id,
+        slug,
+        title: input.title,
+        tingkat: input.tingkat,
+        kategori: input.kategori,
+        peraih: input.peraih,
+        tahun: input.tahun,
+        medali: input.medali,
+        penyelenggara: input.penyelenggara,
+      };
+      const extendedRow = {
+        ...baseRow,
+        description: input.description ?? null,
+        thumbnail: input.thumbnail ?? null,
+      };
+      let res = await supabase.from('prestasi').insert(extendedRow).select('*').single();
+      if (res.error && isMissingColumnError(res.error)) {
+        res = await supabase.from('prestasi').insert(baseRow).select('*').single();
+      }
+      if (!res.error && res.data) {
         markLocalFallbackTable('prestasi', false);
-        const created = data as PrestasiItem;
+        const created: PrestasiItem = {
+          ...(res.data as PrestasiItem),
+          description: (res.data as PrestasiItem).description ?? input.description,
+          thumbnail: (res.data as PrestasiItem).thumbnail ?? input.thumbnail,
+        };
         const curr = readCacheArray<PrestasiItem>(PRESTASI_CACHE_KEY);
         writeCacheArray(PRESTASI_CACHE_KEY, [created, ...curr]);
         broadcastLocalSync('prestasi');
@@ -2299,22 +2320,30 @@ export async function updatePrestasi(
 ): Promise<PrestasiItem> {
   if (supabase && isSupabaseConfigured) {
     try {
-      const { data, error } = await supabase
-        .from('prestasi')
-        .update({
-          title: input.title,
-          tingkat: input.tingkat,
-          kategori: input.kategori,
-          peraih: input.peraih,
-          tahun: input.tahun,
-          medali: input.medali,
-          penyelenggara: input.penyelenggara,
-        })
-        .eq('id', id)
-        .select('*')
-        .single();
-      if (!error && data) {
-        const updated = data as PrestasiItem;
+      const basePatch = {
+        title: input.title,
+        tingkat: input.tingkat,
+        kategori: input.kategori,
+        peraih: input.peraih,
+        tahun: input.tahun,
+        medali: input.medali,
+        penyelenggara: input.penyelenggara,
+      };
+      const extendedPatch = {
+        ...basePatch,
+        description: input.description ?? null,
+        thumbnail: input.thumbnail ?? null,
+      };
+      let res = await supabase.from('prestasi').update(extendedPatch).eq('id', id).select('*').single();
+      if (res.error && isMissingColumnError(res.error)) {
+        res = await supabase.from('prestasi').update(basePatch).eq('id', id).select('*').single();
+      }
+      if (!res.error && res.data) {
+        const updated: PrestasiItem = {
+          ...(res.data as PrestasiItem),
+          description: (res.data as PrestasiItem).description ?? input.description,
+          thumbnail: (res.data as PrestasiItem).thumbnail ?? input.thumbnail,
+        };
         const curr = readCacheArray<PrestasiItem>(PRESTASI_CACHE_KEY);
         writeCacheArray(PRESTASI_CACHE_KEY, curr.map((p) => (p.id === id ? updated : p)));
         broadcastLocalSync('prestasi');

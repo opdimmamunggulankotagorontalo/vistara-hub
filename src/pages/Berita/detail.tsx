@@ -4,6 +4,7 @@ import { ArrowLeft, Calendar, User, Tag } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Badge, LoadingState } from '../../components/ui';
 import ShareButtons from '../../components/ui/ShareButtons';
+import RichTextRenderer from '../../components/ui/RichTextRenderer';
 import type { BeritaItem } from '../../types';
 import { ScrollReveal, TiltSpotlightCard } from '../../components/motion/MotionPrimitives';
 import { fetchBerita, subscribeToTableChanges } from '../../services/dataClient';
@@ -59,10 +60,7 @@ export default function BeritaDetailPage() {
     );
   }
 
-  const bodyParagraphs = (berita.content || '')
-    .split(/\n{2,}|\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
+  const hasContent = Boolean(berita.content && berita.content.trim().length > 0);
 
   return (
     <div>
@@ -109,22 +107,20 @@ export default function BeritaDetailPage() {
 
               <ScrollReveal preset="fadeUp" delay={0.05}>
                 <div className="card">
-                  <p style={{ fontSize: '1.05rem', color: 'var(--charcoal)', lineHeight: 1.8, fontWeight: 500, marginBottom: bodyParagraphs.length > 0 ? '1.25rem' : 0, fontStyle: 'italic', borderLeft: '3px solid var(--soft-lilac)', paddingLeft: '1rem' }}>
-                    {berita.excerpt}
-                  </p>
-                  {bodyParagraphs.map((para, index) => (
-                    <p
-                      key={index}
-                      style={{
-                        fontSize: '0.95rem',
-                        color: 'var(--charcoal)',
-                        lineHeight: 1.9,
-                        marginBottom: index < bodyParagraphs.length - 1 ? '1rem' : 0,
-                      }}
-                    >
-                      {para}
+                  <div
+                    style={{
+                      padding: '1rem 1.25rem',
+                      borderRadius: '12px',
+                      background: 'var(--ghost-purple)',
+                      border: '1px solid var(--pale-lilac)',
+                      marginBottom: hasContent ? '1.5rem' : 0,
+                    }}
+                  >
+                    <p style={{ fontSize: '1.03rem', color: 'var(--deep-violet)', lineHeight: 1.75, fontWeight: 500, margin: 0 }}>
+                      {berita.excerpt}
                     </p>
-                  ))}
+                  </div>
+                  {hasContent && <RichTextRenderer content={berita.content} />}
                 </div>
               </ScrollReveal>
 
