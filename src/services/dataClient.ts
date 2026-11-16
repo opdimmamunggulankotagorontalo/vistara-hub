@@ -333,6 +333,34 @@ function adminHeaders(token?: string): HeadersInit {
   return headers;
 }
 
+async function callTaraPushFunction(
+  action: string,
+  payload: Record<string, unknown> = {}
+): Promise<Record<string, unknown>> {
+  const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/\\/+$/, '');
+  const apiKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+  const adminToken = getStoredAdminSession()?.token;
+
+  if (!baseUrl || !apiKey || !adminToken) {
+    throw new Error('Sesi admin atau konfigurasi layanan notifikasi tidak tersedia.');
+  }
+
+  const response = await fetch(`${baseUrl}/functions/v1/tara-push`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: apiKey,
+      'X-Admin-Token': adminToken,
+    },
+    body: JSON.stringify({ action, ...payload }),
+  });
+  const result = await response.json().catch(() => ({})) as Record<string, unknown>;
+  if (!response.ok) {
+    throw new Error(String(result.error || 'Layanan notifikasi TARA gagal memproses permintaan.'));
+  }
+  return result;
+}
+
 function isSupabaseRpcMissing(err: { code?: string; message?: string } | null | undefined): boolean {
   if (!err) return false;
   const msg = String(err.message || '').toLowerCase();
@@ -2699,28 +2727,34 @@ function mapSupabaseNotificationRow(row: Record<string, unknown>): CustomNotific
 }
 
 export async function fetchCustomNotifications(includeInactive = false): Promise<CustomNotificationItem[]> {
-  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('custom_notifications')) {
-    try {
-      let query = supabase
-        .from('custom_notifications')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (!includeInactive) {
-        query = query.eq('is_active', true);
-      }
-      const { data, error } = await query;
-      if (!error && Array.isArray(data)) {
-        const todayIso = new Date().toISOString().slice(0, 10);
-        const mapped = (data as Array<Record<string, unknown>>)
-          .map(mapSupabaseNotificationRow)
-          .filter((item) => includeInactive || !item.expiresAt || item.expiresAt >= todayIso);
-        if (!includeInactive) {
-          writeCacheArray(NOTIFICATIONS_CACHE_KEY, mapped);
+  if (supabase && isSupabaseConfigured) {
+    if (includeInactive) {
+      try {
+        const result = await callTaraPushFunction('admin-list');
+        if (Array.isArray(result.records)) {
+          return (result.records as Array<Record<string, unknown>>).map(mapSupabaseNotificationRow);
         }
-        return mapped;
+      } catch {
+        // Fall through to the authenticated server API for compatibility.
       }
-    } catch {
-      // fall through to Express API
+    } else {
+      try {
+        const { data, error } = await supabase
+          .from('custom_notifications')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
+        if (!error && Array.isArray(data)) {
+          const todayIso = new Date().toISOString().slice(0, 10);
+          const mapped = (data as Array<Record<string, unknown>>)
+            .map(mapSupabaseNotificationRow)
+            .filter((item) => !item.expiresAt || item.expiresAt >= todayIso);
+          writeCacheArray(NOTIFICATIONS_CACHE_KEY, mapped);
+          return mapped;
+        }
+      } catch {
+        // Fall through to the API/cache for temporary connectivity problems.
+      }
     }
   }
 
@@ -2730,9 +2764,7 @@ export async function fetchCustomNotifications(includeInactive = false): Promise
     if (res.ok) {
       const data = (await res.json()) as { records?: CustomNotificationItem[] };
       if (Array.isArray(data.records)) {
-        if (!includeInactive) {
-          writeCacheArray(NOTIFICATIONS_CACHE_KEY, data.records);
-        }
+        if (!includeInactive) writeCacheArray(NOTIFICATIONS_CACHE_KEY, data.records);
         return data.records;
       }
     }
@@ -2746,36 +2778,21 @@ export async function fetchCustomNotifications(includeInactive = false): Promise
 export async function createCustomNotification(
   input: CustomNotificationInput
 ): Promise<CustomNotificationItem> {
-  const session = getStoredAdminSession();
-  const createdBy = session?.fullName || 'Pengurus OPDIM';
-
   if (supabase && isSupabaseConfigured) {
     try {
-      const id = `notif-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
-      const { data, error } = await supabase
-        .from('custom_notifications')
-        .insert({
-          id,
-          title: input.title.trim(),
-          message: input.message.trim(),
-          category: input.category,
-          target_path: input.targetPath?.trim() || '/beranda',
-          is_active: input.isActive !== false,
-          created_by: createdBy,
-          expires_at: input.expiresAt || null,
-        })
-        .select('*')
-        .single();
-      if (!error && data) {
+      const result = await callTaraPushFunction('admin-create', { input });
+      if (result.record && typeof result.record === 'object') {
         markLocalFallbackTable('custom_notifications', false);
-        const created = mapSupabaseNotificationRow(data as Record<string, unknown>);
+        const created = mapSupabaseNotificationRow(result.record as Record<string, unknown>);
         const curr = readCacheArray<CustomNotificationItem>(NOTIFICATIONS_CACHE_KEY);
         writeCacheArray(NOTIFICATIONS_CACHE_KEY, [created, ...curr]);
         broadcastLocalSync('custom_notifications');
         return created;
       }
-    } catch {
-      // fall through
+      throw new Error('Respons pembuatan notifikasi tidak valid.');
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Sesi admin')) throw error;
+      // Compatibility fallback for installations without a deployed push function.
     }
   }
 
@@ -2800,24 +2817,12 @@ export async function updateCustomNotification(
   id: string,
   input: Partial<CustomNotificationInput>
 ): Promise<CustomNotificationItem> {
-  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('custom_notifications')) {
+  if (supabase && isSupabaseConfigured) {
     try {
-      const payload: Record<string, unknown> = {};
-      if (input.title !== undefined) payload.title = input.title.trim();
-      if (input.message !== undefined) payload.message = input.message.trim();
-      if (input.category !== undefined) payload.category = input.category;
-      if (input.targetPath !== undefined) payload.target_path = input.targetPath.trim() || '/beranda';
-      if (input.isActive !== undefined) payload.is_active = input.isActive;
-      if (input.expiresAt !== undefined) payload.expires_at = input.expiresAt || null;
-
-      const { data, error } = await supabase
-        .from('custom_notifications')
-        .update(payload)
-        .eq('id', id)
-        .select('*')
-        .single();
-      if (!error && data) {
-        const updated = mapSupabaseNotificationRow(data as Record<string, unknown>);
+      const result = await callTaraPushFunction('admin-update', { id, input });
+      if (result.record && typeof result.record === 'object') {
+        markLocalFallbackTable('custom_notifications', false);
+        const updated = mapSupabaseNotificationRow(result.record as Record<string, unknown>);
         const curr = readCacheArray<CustomNotificationItem>(NOTIFICATIONS_CACHE_KEY);
         writeCacheArray(
           NOTIFICATIONS_CACHE_KEY,
@@ -2826,8 +2831,10 @@ export async function updateCustomNotification(
         broadcastLocalSync('custom_notifications');
         return updated;
       }
-    } catch {
-      // fall through
+      throw new Error('Respons pembaruan notifikasi tidak valid.');
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Sesi admin')) throw error;
+      // Compatibility fallback for installations without a deployed push function.
     }
   }
 
@@ -2851,25 +2858,29 @@ export async function updateCustomNotification(
 }
 
 export async function deleteCustomNotification(id: string): Promise<void> {
-  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('custom_notifications')) {
+  if (supabase && isSupabaseConfigured) {
     try {
-      await supabase.from('custom_notifications').delete().eq('id', id);
-    } catch {
-      // ignore
+      await callTaraPushFunction('admin-delete', { id });
+      markLocalFallbackTable('custom_notifications', false);
+      const curr = readCacheArray<CustomNotificationItem>(NOTIFICATIONS_CACHE_KEY);
+      writeCacheArray(NOTIFICATIONS_CACHE_KEY, curr.filter((item) => item.id !== id));
+      broadcastLocalSync('custom_notifications');
+      return;
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Sesi admin')) throw error;
+      // Compatibility fallback for installations without a deployed push function.
     }
   }
-  try {
-    await fetch(`/api/notifications/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-      headers: adminHeaders(),
-    });
-  } catch {
-    // ignore
+
+  const res = await fetch(`/api/notifications/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: adminHeaders(),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal menghapus notifikasi custom.');
   }
   const curr = readCacheArray<CustomNotificationItem>(NOTIFICATIONS_CACHE_KEY);
-  writeCacheArray(
-    NOTIFICATIONS_CACHE_KEY,
-    curr.filter((item) => item.id !== id)
-  );
+  writeCacheArray(NOTIFICATIONS_CACHE_KEY, curr.filter((item) => item.id !== id));
   broadcastLocalSync('custom_notifications');
 }
