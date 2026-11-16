@@ -9,8 +9,10 @@ import type {
   ArsipItem,
   AspirasiRecord,
   BeritaItem,
+  CustomNotificationItem,
   EventItem,
   GaleriItem,
+  NotificationCategory,
   PollingTopic,
   PrestasiItem,
 } from '../types';
@@ -31,6 +33,7 @@ const BERITA_CACHE_KEY = 'vistara_berita_v2';
 const ARSIP_CACHE_KEY = 'vistara_arsip_v2';
 const PRESTASI_CACHE_KEY = 'vistara_prestasi_v1';
 const ANGGOTA_CACHE_KEY = 'vistara_anggota_opdim_v1';
+const NOTIFICATIONS_CACHE_KEY = 'vistara_custom_notifications_v1';
 
 const POLLING_VOTED_KEY = 'vistara_polling_voted_v2';
 const REMINDER_CACHE_KEY = 'vistara_saved_events_v2';
@@ -64,7 +67,8 @@ export type SyncableTable =
   | 'berita'
   | 'arsip'
   | 'prestasi'
-  | 'anggota_opdim';
+  | 'anggota_opdim'
+  | 'custom_notifications';
 
 export interface CreateAspirasiInput {
   jenis: AspirasiRecord['jenis'];
@@ -2667,4 +2671,205 @@ export async function toggleSavedEventId(
     : Array.from(new Set([...cached, eventId]));
   writeCacheArray(REMINDER_CACHE_KEY, next);
   return next;
+}
+
+// ─── Custom Notifications (TARA) Operations ────────────────────
+
+export interface CustomNotificationInput {
+  title: string;
+  message: string;
+  category: NotificationCategory;
+  targetPath?: string;
+  isActive?: boolean;
+  expiresAt?: string | null;
+}
+
+function mapSupabaseNotificationRow(row: Record<string, unknown>): CustomNotificationItem {
+  return {
+    id: String(row.id),
+    title: String(row.title ?? ''),
+    message: String(row.message ?? ''),
+    category: (String(row.category || 'pengumuman') as NotificationCategory),
+    targetPath: String(row.target_path ?? row.targetPath ?? '/beranda'),
+    isActive: Boolean(row.is_active ?? row.isActive ?? true),
+    createdBy: String(row.created_by ?? row.createdBy ?? 'Pengurus OPDIM'),
+    expiresAt: (row.expires_at ?? row.expiresAt ?? null) as string | null,
+    createdAt: (row.created_at ?? row.createdAt ?? Date.now()) as number | string,
+  };
+}
+
+export async function fetchCustomNotifications(includeInactive = false): Promise<CustomNotificationItem[]> {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('custom_notifications')) {
+    try {
+      let query = supabase
+        .from('custom_notifications')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!includeInactive) {
+        query = query.eq('is_active', true);
+      }
+      const { data, error } = await query;
+      if (!error && Array.isArray(data)) {
+        const todayIso = new Date().toISOString().slice(0, 10);
+        const mapped = (data as Array<Record<string, unknown>>)
+          .map(mapSupabaseNotificationRow)
+          .filter((item) => includeInactive || !item.expiresAt || item.expiresAt >= todayIso);
+        if (!includeInactive) {
+          writeCacheArray(NOTIFICATIONS_CACHE_KEY, mapped);
+        }
+        return mapped;
+      }
+    } catch {
+      // fall through to Express API
+    }
+  }
+
+  try {
+    const endpoint = includeInactive ? '/api/notifications?all=1' : '/api/notifications';
+    const res = await fetch(endpoint, includeInactive ? { headers: adminHeaders() } : undefined);
+    if (res.ok) {
+      const data = (await res.json()) as { records?: CustomNotificationItem[] };
+      if (Array.isArray(data.records)) {
+        if (!includeInactive) {
+          writeCacheArray(NOTIFICATIONS_CACHE_KEY, data.records);
+        }
+        return data.records;
+      }
+    }
+  } catch {
+    // offline fallback
+  }
+
+  return readCacheArray<CustomNotificationItem>(NOTIFICATIONS_CACHE_KEY);
+}
+
+export async function createCustomNotification(
+  input: CustomNotificationInput
+): Promise<CustomNotificationItem> {
+  const session = getStoredAdminSession();
+  const createdBy = session?.fullName || 'Pengurus OPDIM';
+
+  if (supabase && isSupabaseConfigured) {
+    try {
+      const id = `notif-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const { data, error } = await supabase
+        .from('custom_notifications')
+        .insert({
+          id,
+          title: input.title.trim(),
+          message: input.message.trim(),
+          category: input.category,
+          target_path: input.targetPath?.trim() || '/beranda',
+          is_active: input.isActive !== false,
+          created_by: createdBy,
+          expires_at: input.expiresAt || null,
+        })
+        .select('*')
+        .single();
+      if (!error && data) {
+        markLocalFallbackTable('custom_notifications', false);
+        const created = mapSupabaseNotificationRow(data as Record<string, unknown>);
+        const curr = readCacheArray<CustomNotificationItem>(NOTIFICATIONS_CACHE_KEY);
+        writeCacheArray(NOTIFICATIONS_CACHE_KEY, [created, ...curr]);
+        broadcastLocalSync('custom_notifications');
+        return created;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch('/api/notifications', {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal membuat notifikasi custom.');
+  }
+  markLocalFallbackTable('custom_notifications', true);
+  const data = (await res.json()) as { record: CustomNotificationItem };
+  const curr = readCacheArray<CustomNotificationItem>(NOTIFICATIONS_CACHE_KEY);
+  writeCacheArray(NOTIFICATIONS_CACHE_KEY, [data.record, ...curr]);
+  broadcastLocalSync('custom_notifications');
+  return data.record;
+}
+
+export async function updateCustomNotification(
+  id: string,
+  input: Partial<CustomNotificationInput>
+): Promise<CustomNotificationItem> {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('custom_notifications')) {
+    try {
+      const payload: Record<string, unknown> = {};
+      if (input.title !== undefined) payload.title = input.title.trim();
+      if (input.message !== undefined) payload.message = input.message.trim();
+      if (input.category !== undefined) payload.category = input.category;
+      if (input.targetPath !== undefined) payload.target_path = input.targetPath.trim() || '/beranda';
+      if (input.isActive !== undefined) payload.is_active = input.isActive;
+      if (input.expiresAt !== undefined) payload.expires_at = input.expiresAt || null;
+
+      const { data, error } = await supabase
+        .from('custom_notifications')
+        .update(payload)
+        .eq('id', id)
+        .select('*')
+        .single();
+      if (!error && data) {
+        const updated = mapSupabaseNotificationRow(data as Record<string, unknown>);
+        const curr = readCacheArray<CustomNotificationItem>(NOTIFICATIONS_CACHE_KEY);
+        writeCacheArray(
+          NOTIFICATIONS_CACHE_KEY,
+          curr.map((item) => (item.id === id ? updated : item))
+        );
+        broadcastLocalSync('custom_notifications');
+        return updated;
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  const res = await fetch(`/api/notifications/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errBody?.error || 'Gagal memperbarui notifikasi custom.');
+  }
+  const data = (await res.json()) as { record: CustomNotificationItem };
+  const curr = readCacheArray<CustomNotificationItem>(NOTIFICATIONS_CACHE_KEY);
+  writeCacheArray(
+    NOTIFICATIONS_CACHE_KEY,
+    curr.map((item) => (item.id === id ? data.record : item))
+  );
+  broadcastLocalSync('custom_notifications');
+  return data.record;
+}
+
+export async function deleteCustomNotification(id: string): Promise<void> {
+  if (supabase && isSupabaseConfigured && !isLocalFallbackTable('custom_notifications')) {
+    try {
+      await supabase.from('custom_notifications').delete().eq('id', id);
+    } catch {
+      // ignore
+    }
+  }
+  try {
+    await fetch(`/api/notifications/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: adminHeaders(),
+    });
+  } catch {
+    // ignore
+  }
+  const curr = readCacheArray<CustomNotificationItem>(NOTIFICATIONS_CACHE_KEY);
+  writeCacheArray(
+    NOTIFICATIONS_CACHE_KEY,
+    curr.filter((item) => item.id !== id)
+  );
+  broadcastLocalSync('custom_notifications');
 }

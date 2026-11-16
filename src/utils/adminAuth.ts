@@ -24,6 +24,7 @@ export const ADMIN_ROLES_META: Record<AdminRole, AdminRoleMeta> = {
       'berita',
       'galeri',
       'anggota',
+      'notifikasi',
       'accounts',
     ],
   },
@@ -42,6 +43,7 @@ export const ADMIN_ROLES_META: Record<AdminRole, AdminRoleMeta> = {
       'berita',
       'galeri',
       'anggota',
+      'notifikasi',
       'accounts',
     ],
   },
@@ -70,6 +72,7 @@ export const ADMIN_MODULE_LABELS: Record<AdminModule, string> = {
   berita: 'Berita',
   galeri: 'Galeri',
   anggota: 'Anggota OPDIM',
+  notifikasi: 'Notifikasi TARA',
   accounts: 'Kelola Akun',
 };
 

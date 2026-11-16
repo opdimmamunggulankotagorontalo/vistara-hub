@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import Layout from './components/layout/Layout';
 import { MotionProvider, useMotionSystem } from './components/motion/MotionProvider';
 import { LoadingState } from './components/ui';
+import TaraNotificationManager from './components/pwa/TaraNotificationManager';
 
 // Eager primary landing route for instant first paint
 import Beranda from './pages/Beranda';
@@ -13,6 +14,7 @@ const Anggota = lazy(() => import('./pages/Anggota'));
 const ProgramKerja = lazy(() => import('./pages/ProgramKerja'));
 const ProgramKerjaDetail = lazy(() => import('./pages/ProgramKerja/detail'));
 const Aspirasi = lazy(() => import('./pages/Aspirasi'));
+const AspirasiTrackDetail = lazy(() => import('./pages/Aspirasi/trackDetail'));
 const Berita = lazy(() => import('./pages/Berita'));
 const BeritaDetail = lazy(() => import('./pages/Berita/detail'));
 const Galeri = lazy(() => import('./pages/Galeri'));
@@ -58,8 +60,9 @@ function PublicLayoutRoutes() {
           <Route path="/beranda/program-kerja" element={<ProgramKerja />} />
           <Route path="/beranda/program-kerja/:slug" element={<ProgramKerjaDetail />} />
 
-          {/* Suara Aspirasi */}
+          {/* Suara Aspirasi + Dedicated Track Detail */}
           <Route path="/beranda/aspirasi" element={<Aspirasi />} />
+          <Route path="/beranda/aspirasi/lacak/:kodeLacak" element={<AspirasiTrackDetail />} />
 
           {/* Berita + Detail */}
           <Route path="/beranda/berita" element={<Berita />} />
@@ -95,6 +98,7 @@ export default function App() {
     <MotionProvider>
       <BrowserRouter>
         <ScrollToTop />
+        <TaraNotificationManager />
         <Routes>
           <Route
             path="/admin/*"

@@ -194,7 +194,22 @@ export type AdminModule =
   | 'berita'
   | 'galeri'
   | 'anggota'
+  | 'notifikasi'
   | 'accounts';
+
+export type NotificationCategory = 'pengumuman' | 'semangat' | 'libur' | 'event' | 'berita';
+
+export interface CustomNotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  category: NotificationCategory;
+  targetPath: string;
+  isActive: boolean;
+  createdBy: string;
+  createdAt: number | string;
+  expiresAt?: string | null;
+}
 
 export type AnggotaUnit =
   | 'pimpinan'

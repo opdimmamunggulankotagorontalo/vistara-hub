@@ -206,6 +206,18 @@ db.exec(`
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS custom_notifications (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'pengumuman',
+    target_path TEXT NOT NULL DEFAULT '/beranda',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_by TEXT NOT NULL,
+    expires_at TEXT,
+    created_at INTEGER NOT NULL
+  );
 `);
 
 // Seed initial Anggota OPDIM from revised Struktur OPDIM VISTARA 2026-2027 if empty
@@ -1938,16 +1950,207 @@ async function startServer() {
     }
   });
 
+  // ── Custom TARA Notifications REST Endpoints ────────────────
+  const VALID_NOTIF_CATEGORIES = new Set(['pengumuman', 'semangat', 'libur', 'event', 'berita']);
+
+  interface SqliteCustomNotificationRow {
+    id: string;
+    title: string;
+    message: string;
+    category: string;
+    target_path: string;
+    is_active: number;
+    created_by: string;
+    expires_at: string | null;
+    created_at: number;
+  }
+
+  function mapNotificationRow(row: SqliteCustomNotificationRow) {
+    return {
+      id: row.id,
+      title: row.title,
+      message: row.message,
+      category: VALID_NOTIF_CATEGORIES.has(row.category) ? row.category : 'pengumuman',
+      targetPath: row.target_path || '/beranda',
+      isActive: Boolean(row.is_active),
+      createdBy: row.created_by || 'Pengurus OPDIM',
+      expiresAt: row.expires_at ?? null,
+      createdAt: row.created_at,
+    };
+  }
+
+  app.get('/api/notifications', (req, res) => {
+    try {
+      const includeAll = String(req.query.all || '') === '1';
+      if (includeAll) {
+        const account = resolveSessionFromToken(extractRequestToken(req));
+        if (!account || (account.role !== 'root' && account.role !== 'inti')) {
+          return res.status(403).json({ error: 'Hanya Super Admin atau Pengurus Inti yang dapat melihat seluruh daftar notifikasi.' });
+        }
+        const rows = db
+          .prepare('SELECT * FROM custom_notifications ORDER BY created_at DESC')
+          .all() as unknown as SqliteCustomNotificationRow[];
+        return res.json({ records: rows.map(mapNotificationRow) });
+      }
+
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const rows = db
+        .prepare('SELECT * FROM custom_notifications WHERE is_active = 1 ORDER BY created_at DESC')
+        .all() as unknown as SqliteCustomNotificationRow[];
+      const activeRows = rows.filter((r) => !r.expires_at || r.expires_at >= todayIso);
+      return res.json({ records: activeRows.map(mapNotificationRow) });
+    } catch (error) {
+      console.error('GET /api/notifications failed:', error);
+      return res.status(500).json({ error: 'Gagal memuat notifikasi custom.' });
+    }
+  });
+
+  app.post('/api/notifications', (req, res) => {
+    const actor = requireAdminSession(req, res, ['root', 'inti']);
+    if (!actor) return;
+    try {
+      const b = req.body ?? {};
+      const title = String(b.title || '').trim().slice(0, 100);
+      const message = String(b.message || '').trim().slice(0, 320);
+      const category = VALID_NOTIF_CATEGORIES.has(String(b.category)) ? String(b.category) : 'pengumuman';
+      const targetPathRaw = String(b.targetPath || '/beranda').trim();
+      const targetPath = targetPathRaw.startsWith('/') ? targetPathRaw : '/beranda';
+      const isActive = b.isActive !== false;
+      const expiresAt = typeof b.expiresAt === 'string' && b.expiresAt.trim() ? b.expiresAt.trim().slice(0, 24) : null;
+
+      if (!title || !message) {
+        return res.status(400).json({ error: 'Judul dan isi pesan notifikasi wajib diisi.' });
+      }
+
+      const id = `notif-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+      const now = Date.now();
+      db.prepare(`
+        INSERT INTO custom_notifications (
+          id, title, message, category, target_path, is_active, created_by, expires_at, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, title, message, category, targetPath, isActive ? 1 : 0, actor.fullName, expiresAt, now);
+
+      const created = db
+        .prepare('SELECT * FROM custom_notifications WHERE id = ?')
+        .get(id) as unknown as SqliteCustomNotificationRow;
+      return res.status(201).json({ record: mapNotificationRow(created) });
+    } catch (error) {
+      console.error('POST /api/notifications failed:', error);
+      return res.status(500).json({ error: 'Gagal menerbitkan notifikasi custom.' });
+    }
+  });
+
+  app.put('/api/notifications/:id', (req, res) => {
+    const actor = requireAdminSession(req, res, ['root', 'inti']);
+    if (!actor) return;
+    try {
+      const id = String(req.params.id || '').trim();
+      const existing = db
+        .prepare('SELECT * FROM custom_notifications WHERE id = ? LIMIT 1')
+        .get(id) as SqliteCustomNotificationRow | undefined;
+      if (!existing) {
+        return res.status(404).json({ error: 'Notifikasi tidak ditemukan.' });
+      }
+
+      const b = req.body ?? {};
+      const title = b.title !== undefined ? String(b.title).trim().slice(0, 100) : existing.title;
+      const message = b.message !== undefined ? String(b.message).trim().slice(0, 320) : existing.message;
+      const category =
+        b.category !== undefined && VALID_NOTIF_CATEGORIES.has(String(b.category))
+          ? String(b.category)
+          : existing.category;
+      const targetPathRaw = b.targetPath !== undefined ? String(b.targetPath).trim() : existing.target_path;
+      const targetPath = targetPathRaw.startsWith('/') ? targetPathRaw : '/beranda';
+      const isActive = b.isActive !== undefined ? Boolean(b.isActive) : Boolean(existing.is_active);
+      const expiresAt =
+        b.expiresAt !== undefined
+          ? typeof b.expiresAt === 'string' && b.expiresAt.trim()
+            ? b.expiresAt.trim().slice(0, 24)
+            : null
+          : existing.expires_at;
+
+      if (!title || !message) {
+        return res.status(400).json({ error: 'Judul dan isi pesan notifikasi wajib diisi.' });
+      }
+
+      db.prepare(`
+        UPDATE custom_notifications
+        SET title = ?, message = ?, category = ?, target_path = ?, is_active = ?, expires_at = ?
+        WHERE id = ?
+      `).run(title, message, category, targetPath, isActive ? 1 : 0, expiresAt, id);
+
+      const updated = db
+        .prepare('SELECT * FROM custom_notifications WHERE id = ?')
+        .get(id) as unknown as SqliteCustomNotificationRow;
+      return res.json({ record: mapNotificationRow(updated) });
+    } catch (error) {
+      console.error('PUT /api/notifications/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal memperbarui notifikasi custom.' });
+    }
+  });
+
+  app.delete('/api/notifications/:id', (req, res) => {
+    if (!requireAdminSession(req, res, ['root', 'inti'])) return;
+    try {
+      db.prepare('DELETE FROM custom_notifications WHERE id = ?').run(String(req.params.id || '').trim());
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error('DELETE /api/notifications/:id failed:', error);
+      return res.status(500).json({ error: 'Gagal menghapus notifikasi custom.' });
+    }
+  });
+
   // ── Vite Dev Middleware / Production Static Serve ───────────
   if (!IS_PROD) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: process.env.DISABLE_HMR === 'true' ? false : undefined,
+        hmr: false,
+        ws: false,
       },
       appType: 'spa',
     });
+
+    // Vite 8 @vite/client calls transport.connect(...) unconditionally even with hmr: false.
+    // Neutralize the WebSocket connect call in middleware mode so proxied previews never emit WebSocket errors.
+    app.use((req, res, next) => {
+      if (req.path !== '/@vite/client') {
+        next();
+        return;
+      }
+      delete req.headers['accept-encoding'];
+      const chunks: Buffer[] = [];
+      const origWrite = res.write.bind(res);
+      const origEnd = res.end.bind(res);
+
+      res.write = ((chunk: unknown) => {
+        if (chunk !== undefined && chunk !== null) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+        }
+        return true;
+      }) as typeof res.write;
+
+      res.end = ((chunk?: unknown, ...rest: unknown[]) => {
+        if (chunk !== undefined && chunk !== null && typeof chunk !== 'function') {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+        }
+        const raw = Buffer.concat(chunks).toString('utf8');
+        const patched = raw.replace(
+          'transport.connect(createHMRHandler(handleMessage));',
+          '/* HMR WebSocket disabled */'
+        );
+        res.removeHeader('Content-Length');
+        res.setHeader('Content-Length', Buffer.byteLength(patched, 'utf8'));
+        res.write = origWrite;
+        res.end = origEnd;
+        const cb = typeof chunk === 'function' ? chunk : rest.find((arg) => typeof arg === 'function');
+        return origEnd(patched, ...(cb ? [cb as () => void] : []));
+      }) as typeof res.end;
+
+      next();
+    });
+
     app.use(vite.middlewares);
   } else {
     const distDir = path.join(__dirname, 'dist');

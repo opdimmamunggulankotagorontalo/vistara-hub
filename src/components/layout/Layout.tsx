@@ -5,6 +5,7 @@ import Footer from './Footer';
 import CustomCursor from '../motion/CustomCursor';
 import ScrollProgressBar from '../motion/ScrollProgressBar';
 import { PageTransition } from '../motion/MotionPrimitives';
+import { OfflineIndicator, PWAInstallBanner } from '../pwa/PWAInstallBanner';
 
 interface LayoutProps {
   children: ReactNode;
@@ -18,6 +19,7 @@ export default function Layout({ children }: LayoutProps) {
       <ScrollProgressBar />
       <CustomCursor />
       <Navbar />
+      <OfflineIndicator />
       <main
         role="main"
         style={{
@@ -30,6 +32,7 @@ export default function Layout({ children }: LayoutProps) {
         <PageTransition routeKey={location.pathname}>{children}</PageTransition>
       </main>
       <Footer />
+      <PWAInstallBanner />
     </div>
   );
 }

@@ -16,6 +16,7 @@ import {
   X,
   Shield,
   Users,
+  Bell,
 } from 'lucide-react';
 import type { AdminModule, AdminSession } from '../../types';
 import {
@@ -34,6 +35,7 @@ import ArsipPanel from './panels/ArsipPanel';
 import AccountsPanel from './panels/AccountsPanel';
 import PrestasiPanel from './panels/PrestasiPanel';
 import AnggotaPanel from './panels/AnggotaPanel';
+import NotificationsPanel from './panels/NotificationsPanel';
 import ForcePasswordChange from './ForcePasswordChange';
 
 interface AdminDashboardProps {
@@ -51,6 +53,7 @@ const MODULE_ICONS: Record<AdminModule, typeof MessageSquare> = {
   berita: Newspaper,
   galeri: ImageIcon,
   anggota: Users,
+  notifikasi: Bell,
   accounts: UserCog,
 };
 
@@ -63,6 +66,7 @@ const MODULE_DESCRIPTIONS: Record<AdminModule, string> = {
   berita: 'Terbitkan dan sunting artikel berita serta dokumentasi humas.',
   galeri: 'Kelola album foto kegiatan dengan optimasi otomatis WebP 1080p.',
   anggota: 'Kelola struktur & foto profil Kepala Madrasah, Pembina, Pengurus Inti, dan 5 Komisi.',
+  notifikasi: 'Buat dan kirim notifikasi custom berikon maskot TARA ke pengguna PWA & browser.',
   accounts: 'Buat & ubah username, password, peran, serta jabatan akun admin pengurus.',
 };
 
@@ -127,6 +131,8 @@ export default function AdminDashboard({
         return <GaleriPanel />;
       case 'anggota':
         return <AnggotaPanel />;
+      case 'notifikasi':
+        return <NotificationsPanel />;
       case 'accounts':
         return (
           <AccountsPanel

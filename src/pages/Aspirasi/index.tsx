@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Send, Search, CheckCircle2,
   Shield, ArrowRight, Copy, Check, MessageSquarePlus,
-  Info, BarChart3
+  Info, BarChart3, ChevronRight
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { Badge, EmptyState, LoadingState } from '../../components/ui';
 import type { AspirasiRecord, PollingTopic } from '../../types';
-import { MagneticWrapper, ScrollReveal } from '../../components/motion/MotionPrimitives';
+import { MagneticWrapper } from '../../components/motion/MotionPrimitives';
 import { useMotionSystem } from '../../components/motion/MotionProvider';
 import {
   fetchAspirasi,
@@ -37,14 +38,6 @@ const JENIS_OPTIONS: { id: AspirasiRecord['jenis']; label: string; icon: string 
   { id: 'Pujian', label: 'Apresiasi', icon: '❤️' },
 ];
 
-const STATUS_STEPS = [
-  { key: 'Diterima', label: 'Diterima', desc: 'Aspirasi masuk ke sistem Komisi 4' },
-  { key: 'Ditinjau', label: 'Ditinjau', desc: 'Diverifikasi kelayakan & urgensi' },
-  { key: 'Didiskusikan', label: 'Didiskusikan', desc: 'Dibahas dalam musyawarah pengurus' },
-  { key: 'Tindak Lanjut', label: 'Tindak Lanjut', desc: 'Disampaikan ke pihak madrasah' },
-  { key: 'Selesai', label: 'Selesai', desc: 'Solusi diterapkan / ditanggapi resmi' },
-];
-
 function getStatusBadgeStyle(status: AspirasiRecord['status']) {
   switch (status) {
     case 'Selesai':
@@ -60,9 +53,19 @@ function getStatusBadgeStyle(status: AspirasiRecord['status']) {
   }
 }
 
+type AspirasiTab = 'kirim' | 'lacak' | 'polling' | 'konsep';
+
+function normalizeAspirasiTab(raw: string | null): AspirasiTab {
+  if (raw === 'lacak' || raw === 'polling' || raw === 'konsep') return raw;
+  return 'kirim';
+}
+
 export default function AspirasiPage() {
   const { reducedMotion } = useMotionSystem();
-  const [activeTab, setActiveTab] = useState<'kirim' | 'lacak' | 'polling' | 'konsep'>('kirim');
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const activeTab = normalizeAspirasiTab(searchParams.get('tab'));
   const [aspirasiList, setAspirasiList] = useState<AspirasiRecord[]>([]);
   const [isLoadingList, setIsLoadingList] = useState<boolean>(true);
   const [polls, setPolls] = useState<PollingTopic[]>([]);
@@ -86,19 +89,19 @@ export default function AspirasiPage() {
 
   // Tracking Lookup State
   const [trackQuery, setTrackQuery] = useState<string>('');
-  const [selectedTrackRecord, setSelectedTrackRecord] = useState<AspirasiRecord | null>(null);
+  const [trackNotFound, setTrackNotFound] = useState<string>('');
+  const [trackFilter, setTrackFilter] = useState<'all' | 'diproses' | 'selesai'>('all');
   const [isSearchingTrack, setIsSearchingTrack] = useState<boolean>(false);
+
+  const selectTab = (tab: AspirasiTab) => {
+    if (tab === 'kirim') setSubmittedRecord(null);
+    setTrackNotFound('');
+    setSearchParams(tab === 'kirim' ? {} : { tab }, { replace: true });
+  };
 
   const refreshAspirasi = useCallback(async () => {
     const records = await fetchAspirasi();
     setAspirasiList(records);
-    setSelectedTrackRecord((prev) => {
-      if (prev) {
-        const match = records.find((r) => r.kodeLacak === prev.kodeLacak);
-        if (match) return match;
-      }
-      return records[0] ?? null;
-    });
   }, []);
 
   const refreshPolls = useCallback(async () => {
@@ -112,13 +115,6 @@ export default function AspirasiPage() {
       .then(([records, latestPolls]) => {
         if (!active) return;
         setAspirasiList(records);
-        setSelectedTrackRecord((prev) => {
-          if (prev) {
-            const match = records.find((r) => r.kodeLacak === prev.kodeLacak);
-            if (match) return match;
-          }
-          return records[0] ?? null;
-        });
         setPolls(latestPolls);
       })
       .finally(() => {
@@ -188,7 +184,6 @@ export default function AspirasiPage() {
         ...prev.filter((item) => item.id !== created.id),
       ]);
       setSubmittedRecord(created);
-      setSelectedTrackRecord(created);
       setTrackQuery(created.kodeLacak);
 
       setJudul('');
@@ -212,11 +207,19 @@ export default function AspirasiPage() {
 
   const handleSearchTrack = async (codeToFind?: string) => {
     const q = (codeToFind !== undefined ? codeToFind : trackQuery).trim().toUpperCase();
-    if (!q) return;
+    if (!q) {
+      setTrackNotFound('Masukkan kode lacak terlebih dahulu (contoh: ASP-2026-1001).');
+      return;
+    }
+    setTrackNotFound('');
     setIsSearchingTrack(true);
     try {
       const found = await trackAspirasi(q);
-      setSelectedTrackRecord(found);
+      if (found) {
+        navigate(`/beranda/aspirasi/lacak/${encodeURIComponent(found.kodeLacak)}`);
+      } else {
+        setTrackNotFound(`Kode "${q}" tidak ditemukan. Periksa kembali kode lacak Anda atau pilih dari daftar di bawah.`);
+      }
     } finally {
       setIsSearchingTrack(false);
     }
@@ -225,6 +228,11 @@ export default function AspirasiPage() {
   const totalCount = aspirasiList.length;
   const selesaiCount = aspirasiList.filter((item) => item.status === 'Selesai').length;
   const diprosesCount = totalCount - selesaiCount;
+  const filteredTrackList = aspirasiList.filter((item) => {
+    if (trackFilter === 'selesai') return item.status === 'Selesai';
+    if (trackFilter === 'diproses') return item.status !== 'Selesai';
+    return true;
+  });
 
   return (
     <div className="aspirasi-page">
@@ -309,10 +317,7 @@ export default function AspirasiPage() {
                     key={tab.id}
                     type="button"
                     className="aspirasi-tab-btn"
-                    onClick={() => {
-                      setActiveTab(tab.id);
-                      if (tab.id === 'kirim') setSubmittedRecord(null);
-                    }}
+                    onClick={() => selectTab(tab.id)}
                     style={{
                       position: 'relative',
                       display: 'flex',
@@ -457,14 +462,12 @@ export default function AspirasiPage() {
                       <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button
                           type="button"
-                          onClick={() => {
-                            setActiveTab('lacak');
-                            setTrackQuery(submittedRecord.kodeLacak);
-                            setSelectedTrackRecord(submittedRecord);
-                          }}
+                          onClick={() =>
+                            navigate(`/beranda/aspirasi/lacak/${encodeURIComponent(submittedRecord.kodeLacak)}`)
+                          }
                           className="btn btn-primary"
                         >
-                          Lihat Progres & Status Lacak <ArrowRight size={15} />
+                          Buka Halaman Lacak Progres <ArrowRight size={15} />
                         </button>
                         <button
                           type="button"
@@ -706,7 +709,7 @@ export default function AspirasiPage() {
               </motion.div>
             )}
 
-            {/* ── TAB 2: LACAK STATUS ASPIRASI ── */}
+            {/* ── TAB 2: LACAK STATUS ASPIRASI (RINGKAS & NAVIGASI KE HALAMAN DETAIL) ── */}
             {activeTab === 'lacak' && (
               <motion.div
                 key="tab-lacak"
@@ -714,38 +717,67 @@ export default function AspirasiPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={reducedMotion ? undefined : { opacity: 0, y: -8 }}
                 transition={{ duration: 0.22 }}
-                style={{ maxWidth: '840px', margin: '0 auto' }}
+                style={{ maxWidth: '760px', margin: '0 auto' }}
               >
                 <div
                   className="card aspirasi-track-search"
                   style={{
-                    padding: '1.5rem',
-                    marginBottom: '1.75rem',
+                    padding: '1.25rem',
+                    marginBottom: '1.25rem',
                     background: 'white',
                     border: '1px solid var(--pale-lilac)',
-                    boxShadow: '0 4px 20px rgba(45, 27, 105, 0.04)',
+                    boxShadow: '0 4px 18px rgba(45, 27, 105, 0.04)',
                   }}
                 >
-                  <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.8rem', fontWeight: 700, color: 'var(--deep-violet)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-header)',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      color: 'var(--deep-violet)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.07em',
+                      marginBottom: '0.5rem',
+                    }}
+                  >
                     Lacak Progres Aspirasi dengan Kode Unik
                   </div>
 
                   <div className="aspirasi-track-search-row" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <div className="aspirasi-track-input-wrap" style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-                      <Search size={18} style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--mid-grey)' }} />
+                    <div className="aspirasi-track-input-wrap" style={{ position: 'relative', flex: 1, minWidth: '210px' }}>
+                      <Search
+                        size={17}
+                        style={{
+                          position: 'absolute',
+                          left: '0.85rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          color: 'var(--mid-grey)',
+                        }}
+                      />
                       <input
                         type="text"
-                        placeholder="Masukkan kode lacak (contoh: ASP-2026-1001)..."
+                        aria-label="Masukkan kode lacak aspirasi"
+                        placeholder="Masukkan kode lacak (mis. ASP-2026-1001)..."
                         value={trackQuery}
-                        onChange={(e) => setTrackQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSearchTrack()}
+                        onChange={(e) => {
+                          setTrackQuery(e.target.value);
+                          if (trackNotFound) setTrackNotFound('');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            void handleSearchTrack();
+                          }
+                        }}
                         style={{
                           width: '100%',
-                          padding: '0.75rem 1rem 0.75rem 2.6rem',
+                          minHeight: '44px',
+                          padding: '0.65rem 0.9rem 0.65rem 2.5rem',
                           borderRadius: '10px',
                           border: '1.5px solid var(--pale-lilac)',
                           fontFamily: 'var(--font-mono)',
-                          fontSize: '0.9rem',
+                          fontSize: '0.88rem',
                           outline: 'none',
                           textTransform: 'uppercase',
                         }}
@@ -755,305 +787,222 @@ export default function AspirasiPage() {
                     <button
                       type="button"
                       disabled={isSearchingTrack}
-                      onClick={() => handleSearchTrack()}
+                      onClick={() => void handleSearchTrack()}
                       className="btn btn-primary aspirasi-track-btn"
-                      style={{ padding: '0.75rem 1.25rem', opacity: isSearchingTrack ? 0.7 : 1 }}
+                      style={{ minHeight: '44px', padding: '0 1.15rem', opacity: isSearchingTrack ? 0.7 : 1 }}
                     >
-                      <Search size={16} /> {isSearchingTrack ? 'Mencari...' : 'Cari Status'}
+                      <Search size={15} /> {isSearchingTrack ? 'Membuka...' : 'Buka Lacak'}
                     </button>
                   </div>
 
+                  {trackNotFound && (
+                    <div
+                      role="alert"
+                      style={{
+                        marginTop: '0.75rem',
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: '9px',
+                        background: '#FFF5F5',
+                        border: '1px solid #FFCDD2',
+                        color: '#C62828',
+                        fontSize: '0.8rem',
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      {trackNotFound}
+                    </div>
+                  )}
+
                   {aspirasiList.length > 0 && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.875rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.72rem', color: 'var(--mid-grey)', fontFamily: 'var(--font-header)' }}>
-                        Kode terbaru:
+                        Pintasan kode:
                       </span>
                       {aspirasiList.slice(0, 4).map((item) => (
-                        <button
+                        <Link
                           key={item.id}
-                          type="button"
-                          onClick={() => {
-                            setTrackQuery(item.kodeLacak);
-                            handleSearchTrack(item.kodeLacak);
-                          }}
+                          to={`/beranda/aspirasi/lacak/${encodeURIComponent(item.kodeLacak)}`}
                           style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            minHeight: '32px',
                             background: 'var(--ghost-purple)',
                             border: '1px solid var(--pale-lilac)',
-                            borderRadius: '6px',
-                            padding: '0.2rem 0.5rem',
+                            borderRadius: '7px',
+                            padding: '0.2rem 0.55rem',
                             fontSize: '0.72rem',
                             fontFamily: 'var(--font-mono)',
+                            fontWeight: 700,
                             color: 'var(--vistara-purple)',
-                            cursor: 'pointer',
+                            textDecoration: 'none',
                           }}
                         >
                           {item.kodeLacak}
-                        </button>
+                        </Link>
                       ))}
                     </div>
                   )}
                 </div>
 
-                {selectedTrackRecord ? (
-                  <div
-                    className="card aspirasi-track-card"
-                    style={{
-                      padding: '2rem',
-                      marginBottom: '2.5rem',
-                      border: '1.5px solid var(--pale-lilac)',
-                      background: 'white',
-                      boxShadow: '0 8px 30px rgba(45, 27, 105, 0.05)',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+                {isLoadingList ? (
+                  <LoadingState />
+                ) : aspirasiList.length === 0 ? (
+                  <EmptyState
+                    title="Belum ada aspirasi tercatat"
+                    description="Sampaikan aspirasi pertamamu di tab Kirim Aspirasi, lalu lacak tindak lanjutnya di halaman khusus."
+                  />
+                ) : (
+                  <div className="aspirasi-public-list-wrap">
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '0.6rem',
+                        marginBottom: '0.75rem',
+                      }}
+                    >
                       <div>
-                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
-                          <span
-                            style={{
-                              fontFamily: 'var(--font-mono)',
-                              fontWeight: 800,
-                              fontSize: '0.85rem',
-                              color: 'var(--vistara-purple)',
-                              background: 'var(--lavender-mist)',
-                              padding: '0.2rem 0.6rem',
-                              borderRadius: '6px',
-                            }}
-                          >
-                            {selectedTrackRecord.kodeLacak}
-                          </span>
-                          <Badge variant="ghost">{selectedTrackRecord.kategori}</Badge>
-                          <span className="badge" style={{ background: 'var(--ghost-purple)', color: 'var(--deep-violet)' }}>
-                            {selectedTrackRecord.jenis}
-                          </span>
-                        </div>
-                        <h3 style={{ fontSize: '1.25rem', color: 'var(--deep-violet)', margin: '0.35rem 0' }}>
-                          {selectedTrackRecord.judul}
+                        <h3 style={{ fontSize: '1.08rem', color: 'var(--deep-violet)', margin: 0 }}>
+                          Daftar Lacak Aspirasi ({filteredTrackList.length})
                         </h3>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--mid-grey)' }}>
-                          Tanggal Pengiriman: <strong>{selectedTrackRecord.tanggal}</strong> • Pengirim:{' '}
-                          <strong>{selectedTrackRecord.isAnonim ? 'Anonim (Dirahasiakan)' : `${selectedTrackRecord.namaPengirim} (${selectedTrackRecord.kelasPengirim})`}</strong>
-                        </div>
+                        <p style={{ fontSize: '0.76rem', color: 'var(--mid-grey)', margin: '0.15rem 0 0' }}>
+                          Pilih salah satu aspirasi untuk membuka halaman detail tindak lanjut resmi.
+                        </p>
                       </div>
 
-                      <div>
-                        {(() => {
-                          const b = getStatusBadgeStyle(selectedTrackRecord.status);
+                      <div style={{ display: 'flex', gap: '0.3rem' }}>
+                        {[
+                          { id: 'all' as const, label: 'Semua' },
+                          { id: 'diproses' as const, label: 'Diproses' },
+                          { id: 'selesai' as const, label: 'Selesai' },
+                        ].map((f) => {
+                          const active = trackFilter === f.id;
                           return (
-                            <span
-                              className="badge"
+                            <button
+                              key={f.id}
+                              type="button"
+                              onClick={() => setTrackFilter(f.id)}
                               style={{
-                                background: b.bg,
-                                color: b.color,
-                                border: `1px solid ${b.border}`,
-                                fontSize: '0.8rem',
-                                padding: '0.4rem 0.9rem',
+                                minHeight: '34px',
+                                padding: '0.25rem 0.65rem',
+                                borderRadius: '8px',
+                                border: `1px solid ${active ? 'var(--vistara-purple)' : 'var(--pale-lilac)'}`,
+                                background: active ? 'var(--deep-violet)' : '#FFFFFF',
+                                color: active ? '#FFFFFF' : 'var(--deep-violet)',
+                                fontFamily: 'var(--font-header)',
+                                fontSize: '0.74rem',
                                 fontWeight: 700,
+                                cursor: 'pointer',
                               }}
                             >
-                              Status: {selectedTrackRecord.status}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                    </div>
-
-                    <div className="aspirasi-track-quote" style={{ background: 'var(--warm-white)', padding: '1rem', borderRadius: '10px', borderLeft: '3px solid var(--soft-lilac)', marginBottom: '1.75rem', fontSize: '0.88rem', color: 'var(--charcoal)', lineHeight: 1.6 }}>
-                      "{selectedTrackRecord.isi}"
-                    </div>
-
-                    {/* 5-STAGE PROGRESS STEPPER */}
-                    <div className="aspirasi-stepper-wrap" style={{ marginBottom: '2rem' }}>
-                      <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--mid-grey)', marginBottom: '0.75rem' }}>
-                        Alur Status Penanganan Resmi
-                      </div>
-
-                      <div className="aspirasi-stepper" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.5rem' }}>
-                        {STATUS_STEPS.map((step, idx) => {
-                          const stepIndexMap: Record<string, number> = {
-                            Diterima: 0,
-                            Ditinjau: 1,
-                            Didiskusikan: 2,
-                            'Tindak Lanjut': 3,
-                            Selesai: 4,
-                          };
-                          const currentIdx = stepIndexMap[selectedTrackRecord.status] ?? 0;
-                          const isDone = idx <= currentIdx;
-                          const isCurrent = idx === currentIdx;
-
-                          return (
-                            <motion.div
-                              key={step.key}
-                              className="aspirasi-stepper-item"
-                              initial={reducedMotion ? false : { opacity: 0, y: 8 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: idx * 0.05 }}
-                              style={{
-                                background: isCurrent ? 'var(--ghost-purple)' : isDone ? 'white' : 'var(--warm-white)',
-                                border: `1.5px solid ${isCurrent ? 'var(--vistara-purple)' : isDone ? 'var(--pale-lilac)' : '#E0E0E0'}`,
-                                borderRadius: '10px',
-                                padding: '0.75rem',
-                                position: 'relative',
-                              }}
-                            >
-                              <div className="aspirasi-stepper-head" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
-                                <span
-                                  style={{
-                                    width: '20px',
-                                    height: '20px',
-                                    borderRadius: '50%',
-                                    background: isDone ? 'var(--vistara-purple)' : '#D0D0D0',
-                                    color: 'white',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '0.65rem',
-                                    fontWeight: 800,
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  {isDone ? '✓' : idx + 1}
-                                </span>
-                                <strong style={{ fontSize: '0.78rem', color: isDone ? 'var(--deep-violet)' : 'var(--mid-grey)' }}>
-                                  {step.label}
-                                </strong>
-                              </div>
-                              <div className="aspirasi-stepper-desc" style={{ fontSize: '0.68rem', color: 'var(--mid-grey)', lineHeight: 1.3 }}>
-                                {step.desc}
-                              </div>
-                            </motion.div>
+                              {f.label}
+                            </button>
                           );
                         })}
                       </div>
                     </div>
 
-                    {selectedTrackRecord.tanggapanResmi && (
-                      <div style={{ background: 'rgba(46, 125, 50, 0.05)', border: '1px solid rgba(46, 125, 50, 0.25)', borderRadius: '12px', padding: '1.25rem', marginBottom: '1.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-                          <CheckCircle2 size={18} style={{ color: '#2E7D32' }} />
-                          <h4 style={{ margin: 0, color: '#2E7D32', fontSize: '0.92rem' }}>
-                            Tanggapan & Tindak Lanjut Resmi
-                          </h4>
+                    <div
+                      style={{
+                        background: '#FFFFFF',
+                        border: '1px solid var(--pale-lilac)',
+                        borderRadius: '14px',
+                        overflow: 'hidden',
+                        boxShadow: '0 4px 16px rgba(45, 27, 105, 0.03)',
+                      }}
+                    >
+                      {filteredTrackList.length === 0 ? (
+                        <div style={{ padding: '1.25rem', textAlign: 'center', fontSize: '0.82rem', color: 'var(--mid-grey)' }}>
+                          Tidak ada aspirasi pada filter ini.
                         </div>
-                        <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--charcoal)', lineHeight: 1.6 }}>
-                          {selectedTrackRecord.tanggapanResmi}
-                        </p>
-                        {selectedTrackRecord.penindaklanjut && (
-                          <div style={{ fontSize: '0.72rem', color: 'var(--mid-grey)', marginTop: '0.5rem' }}>
-                            Oleh: <strong>{selectedTrackRecord.penindaklanjut}</strong>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {selectedTrackRecord.riwayatStatus && selectedTrackRecord.riwayatStatus.length > 0 && (
-                      <div>
-                        <div style={{ fontFamily: 'var(--font-header)', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--mid-grey)', marginBottom: '0.75rem' }}>
-                          Catatan Riwayat Tindak Lanjut
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          {selectedTrackRecord.riwayatStatus.map((log, i) => (
-                            <div key={i} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', fontSize: '0.8rem', background: 'var(--ghost-purple)', padding: '0.6rem 0.85rem', borderRadius: '8px', flexWrap: 'wrap' }}>
-                              <span style={{ color: 'var(--vistara-purple)', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                                [{log.waktu}]
-                              </span>
-                              <span style={{ color: 'var(--deep-violet)', fontWeight: 600 }}>
-                                {log.status}:
-                              </span>
-                              <span style={{ color: 'var(--charcoal)', flex: 1 }}>
-                                {log.keterangan}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                  </div>
-                ) : isLoadingList ? (
-                  <LoadingState />
-                ) : trackQuery.trim() ? (
-                  <EmptyState
-                    title="Aspirasi tidak ditemukan"
-                    description={`Tidak ditemukan data aspirasi dengan kode "${trackQuery}". Pastikan kode yang dimasukkan benar.`}
-                  />
-                ) : (
-                  <EmptyState
-                    title="Belum ada aspirasi tercatat"
-                    description="Sampaikan aspirasi pertamamu di tab Kirim Aspirasi, lalu pantau statusnya di sini dengan kode lacak."
-                  />
-                )}
-
-                {aspirasiList.length > 0 && (
-                  <div className="aspirasi-public-list-wrap" style={{ marginTop: '3rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <div>
-                        <h3 style={{ fontSize: '1.2rem', color: 'var(--deep-violet)', margin: 0 }}>
-                          Daftar Aspirasi Publik Terbaru
-                        </h3>
-                        <p style={{ fontSize: '0.8rem', color: 'var(--mid-grey)', margin: '0.2rem 0 0' }}>
-                          Transparansi suara siswa yang telah diverifikasi dan sedang ditangani OPDIM.
-                        </p>
-                      </div>
-                      <div className="tabular-nums" style={{ fontSize: '0.8rem', color: 'var(--mid-grey)' }}>
-                        {isLoadingList ? 'Memuat...' : <>Total <strong>{aspirasiList.length}</strong> aspirasi tercatat</>}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      {aspirasiList.map((item, idx) => {
-                        const b = getStatusBadgeStyle(item.status);
-                        return (
-                          <ScrollReveal key={item.id} preset="fadeUp" delay={Math.min(idx * 0.04, 0.2)}>
-                            <div
-                              className="card aspirasi-public-item"
+                      ) : (
+                        filteredTrackList.map((item, idx) => {
+                          const b = getStatusBadgeStyle(item.status);
+                          return (
+                            <Link
+                              key={item.id}
+                              to={`/beranda/aspirasi/lacak/${encodeURIComponent(item.kodeLacak)}`}
+                              className="aspirasi-compact-row"
                               style={{
-                                padding: '1rem 1.25rem',
                                 display: 'flex',
-                                justifyContent: 'space-between',
                                 alignItems: 'center',
-                                gap: '1rem',
-                                flexWrap: 'wrap',
-                                cursor: 'pointer',
-                                border: selectedTrackRecord?.id === item.id ? '1.5px solid var(--vistara-purple)' : '1px solid var(--pale-lilac)',
-                              }}
-                              onClick={() => {
-                                setSelectedTrackRecord(item);
-                                setTrackQuery(item.kodeLacak);
+                                justifyContent: 'space-between',
+                                gap: '0.75rem',
+                                minHeight: '60px',
+                                padding: '0.75rem 1rem',
+                                textDecoration: 'none',
+                                borderTop: idx === 0 ? 'none' : '1px solid #EFE9FA',
+                                transition: 'background-color 140ms ease',
                               }}
                             >
-                              <div style={{ flex: 1, minWidth: '220px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
-                                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--vistara-purple)', fontWeight: 700 }}>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.35rem',
+                                    flexWrap: 'wrap',
+                                    fontSize: '0.72rem',
+                                    color: 'var(--mid-grey)',
+                                    marginBottom: '0.15rem',
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontFamily: 'var(--font-mono)',
+                                      fontWeight: 700,
+                                      color: 'var(--vistara-purple)',
+                                    }}
+                                  >
                                     {item.kodeLacak}
                                   </span>
-                                  <span style={{ fontSize: '0.72rem', color: 'var(--mid-grey)' }}>•</span>
-                                  <Badge variant="ghost" size="sm">{item.kategori}</Badge>
+                                  <span aria-hidden="true">·</span>
+                                  <span>{item.kategori}</span>
+                                  <span aria-hidden="true">·</span>
+                                  <span>{item.tanggal}</span>
                                 </div>
-                                <h4 style={{ fontSize: '0.92rem', color: 'var(--deep-violet)', margin: 0 }}>
+                                <div
+                                  style={{
+                                    fontFamily: 'var(--font-header)',
+                                    fontSize: '0.88rem',
+                                    fontWeight: 700,
+                                    color: 'var(--deep-violet)',
+                                    lineHeight: 1.3,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    display: '-webkit-box',
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: 'vertical',
+                                  }}
+                                >
                                   {item.judul}
-                                </h4>
+                                </div>
                               </div>
 
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
                                 <span
-                                  className="badge"
                                   style={{
                                     background: b.bg,
                                     color: b.color,
                                     border: `1px solid ${b.border}`,
-                                    fontSize: '0.72rem',
+                                    borderRadius: '7px',
+                                    padding: '0.2rem 0.5rem',
+                                    fontFamily: 'var(--font-header)',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    whiteSpace: 'nowrap',
                                   }}
                                 >
                                   {item.status}
                                 </span>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--vistara-purple)', fontWeight: 700 }}>
-                                  Pilih & Lacak →
-                                </span>
+                                <ChevronRight size={16} style={{ color: 'var(--vistara-purple)' }} />
                               </div>
-                            </div>
-                          </ScrollReveal>
-                        );
-                      })}
+                            </Link>
+                          );
+                        })
+                      )}
                     </div>
                   </div>
                 )}
@@ -1243,6 +1192,9 @@ export default function AspirasiPage() {
       </section>
 
       <style>{`
+        .aspirasi-compact-row:hover {
+          background: var(--ghost-purple);
+        }
         @media (max-width: 767px) {
           .aspirasi-page .page-hero {
             padding: 1.25rem 0 1.1rem !important;
@@ -1298,7 +1250,6 @@ export default function AspirasiPage() {
           }
           .aspirasi-card,
           .aspirasi-track-search,
-          .aspirasi-track-card,
           .aspirasi-poll-card,
           .aspirasi-sop-card {
             padding: 1rem !important;
@@ -1348,7 +1299,7 @@ export default function AspirasiPage() {
             margin-top: 0.1rem !important;
           }
           .aspirasi-track-search {
-            margin-bottom: 1rem !important;
+            margin-bottom: 0.9rem !important;
           }
           .aspirasi-track-input-wrap {
             min-width: 0 !important;
@@ -1356,59 +1307,14 @@ export default function AspirasiPage() {
           }
           .aspirasi-track-btn {
             width: 100% !important;
-            min-height: 42px !important;
+            min-height: 44px !important;
             padding: 0.55rem 1rem !important;
           }
-          .aspirasi-track-card {
-            margin-bottom: 1.25rem !important;
-          }
-          .aspirasi-track-quote {
-            padding: 0.75rem !important;
-            margin-bottom: 1rem !important;
-            font-size: 0.82rem !important;
-          }
-          .aspirasi-stepper-wrap {
-            margin-bottom: 1.15rem !important;
-          }
-          .aspirasi-stepper {
-            grid-template-columns: 1fr !important;
-            gap: 0.35rem !important;
-          }
-          .aspirasi-stepper-item {
-            display: flex !important;
-            align-items: center !important;
-            justify-content: space-between !important;
-            gap: 0.5rem !important;
-            padding: 0.48rem 0.65rem !important;
-          }
-          .aspirasi-stepper-head {
-            margin-bottom: 0 !important;
-            flex-shrink: 0 !important;
-          }
-          .aspirasi-stepper-desc {
-            text-align: right !important;
-            font-size: 0.64rem !important;
-            line-height: 1.25 !important;
-          }
-          .aspirasi-commission-grid {
-            display: grid !important;
-            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-            gap: 0.4rem !important;
-          }
-          .aspirasi-commission-btn {
-            min-height: 38px !important;
-            padding: 0.4rem 0.5rem !important;
-            font-size: 0.73rem !important;
-          }
           .aspirasi-public-list-wrap {
-            margin-top: 1.4rem !important;
+            margin-top: 0.75rem !important;
           }
-          .aspirasi-public-item {
-            padding: 0.8rem 0.9rem !important;
-            gap: 0.6rem !important;
-          }
-          .aspirasi-public-item > div:first-child {
-            min-width: 0 !important;
+          .aspirasi-compact-row {
+            padding: 0.7rem 0.85rem !important;
           }
           .aspirasi-poll-list {
             gap: 0.85rem !important;

@@ -707,6 +707,23 @@ CREATE POLICY "Public manage anggota_opdim" ON public.anggota_opdim FOR ALL USIN
 DROP POLICY IF EXISTS "Public manage own reminders" ON public.event_reminders;
 CREATE POLICY "Public manage own reminders" ON public.event_reminders FOR ALL USING (true) WITH CHECK (true);
 
+-- 9. Notifikasi Custom Maskot TARA (Admin Root & Pengurus Inti)
+CREATE TABLE IF NOT EXISTS public.custom_notifications (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'pengumuman',
+  target_path TEXT NOT NULL DEFAULT '/beranda',
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by TEXT NOT NULL DEFAULT 'Pengurus OPDIM',
+  expires_at TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.custom_notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public manage custom_notifications" ON public.custom_notifications;
+CREATE POLICY "Public manage custom_notifications" ON public.custom_notifications FOR ALL USING (true) WITH CHECK (true);
+
 -- Supabase Storage Bucket for Optimized 1080p WebP Media & Documents
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('vistara-media', 'vistara-media', true)
@@ -740,6 +757,7 @@ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.arsip;
   ALTER PUBLICATION supabase_realtime ADD TABLE public.prestasi;
   ALTER PUBLICATION supabase_realtime ADD TABLE public.anggota_opdim;
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.custom_notifications;
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
