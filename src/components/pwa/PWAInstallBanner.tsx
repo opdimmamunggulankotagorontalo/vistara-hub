@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bell, Download, Share, X, WifiOff } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useOnlineStatus, usePWAInstall } from '../../hooks/usePWAInstall';
@@ -61,6 +61,12 @@ export function OfflineIndicator() {
 
 export function PWAInstallBanner() {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
+  const [showPrompt, setShowPrompt] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowPrompt(true), 5000);
+    return () => window.clearTimeout(timer);
+  }, []);
   const [installDismissed, setInstallDismissed] = useState<boolean>(() => isInstallBannerDismissed());
   const [showIOSGuide, setShowIOSGuide] = useState(false);
 
@@ -114,12 +120,12 @@ export function PWAInstallBanner() {
   return (
     <>
       <AnimatePresence>
-        {(canShowInstall || canShowNotifPrompt) && (
+        {showPrompt && (canShowInstall || canShowNotifPrompt) && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0, y: 64, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 32, scale: 0.98 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             role="region"
             aria-label={canShowInstall ? 'Pasang Aplikasi OPDIM VISTARA' : 'Aktifkan Notifikasi TARA'}
             style={{
