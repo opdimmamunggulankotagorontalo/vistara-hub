@@ -337,7 +337,7 @@ async function callTaraPushFunction(
   action: string,
   payload: Record<string, unknown> = {}
 ): Promise<Record<string, unknown>> {
-  const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/\\/+$/, '');
+  const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '');
   const apiKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
   const adminToken = getStoredAdminSession()?.token;
 
