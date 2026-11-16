@@ -180,11 +180,17 @@ async function dispatch() {
   let sent = 0, failed = 0;
   for (const job of claimed) {
     if (!devices.length) {
+      const expired = Date.now() - new Date(job.created_at).getTime() >= 24 * 60 * 60 * 1000;
       await db.from("tara_push_outbox").update({
-        status: "sent", sent_at: new Date().toISOString(), recipient_count: 0,
-        last_error: null, updated_at: new Date().toISOString(),
+        status: expired ? "failed" : "pending",
+        available_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+        attempts: Math.max(0, Number(job.attempts) - 1),
+        sent_at: null,
+        recipient_count: 0,
+        last_error: expired ? "Kedaluwarsa: belum ada perangkat yang berlangganan dalam 24 jam." : "Menunggu perangkat pertama berlangganan.",
+        updated_at: new Date().toISOString(),
       }).eq("id", job.id);
-      sent++;
+      if (expired) failed++;
       continue;
     }
     const payload = JSON.stringify({
