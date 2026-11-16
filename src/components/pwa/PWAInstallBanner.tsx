@@ -125,9 +125,10 @@ export function PWAInstallBanner() {
             style={{
               position: 'fixed',
               bottom: 'max(12px, env(safe-area-inset-bottom))',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 'min(calc(100% - 24px), 480px)',
+              left: '12px',
+              right: '12px',
+              width: 'min(480px, calc(100% - 24px))',
+              marginInline: 'auto',
               zIndex: 45,
               background: 'rgba(26, 14, 56, 0.96)',
               backdropFilter: 'blur(14px)',
