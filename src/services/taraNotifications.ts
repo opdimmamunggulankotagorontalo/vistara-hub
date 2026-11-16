@@ -17,7 +17,7 @@ async function callTaraPushApi(
   action: string,
   payload: Record<string, unknown> = {}
 ): Promise<unknown> {
-  const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/\\/+$/, '');
+  const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '');
   const apiKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
   if (!baseUrl || !apiKey) {
     throw new Error('Konfigurasi layanan notifikasi VISTARA belum tersedia.');
