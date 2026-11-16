@@ -1,30 +1,29 @@
 import { useEffect } from 'react';
 import { registerSW } from 'virtual:pwa-register';
 import {
-  fetchBerita,
-  fetchCustomNotifications,
-  fetchEvents,
-  subscribeToTableChanges,
-} from '../../services/dataClient';
-import {
-  evaluateDailyAndHolidayNotification,
-  syncCustomTaraNotifications,
-  syncNewContentNotifications,
+  ensureTaraPushSubscription,
+  getNotificationPermissionState,
 } from '../../services/taraNotifications';
 
 export default function TaraNotificationManager() {
   useEffect(() => {
+    let updateInterval: number | undefined;
+
     const updateSW = registerSW({
       immediate: true,
       onRegisteredSW(_swUrl, registration) {
-        if (registration) {
-          setInterval(() => {
+        if (registration && updateInterval === undefined) {
+          updateInterval = window.setInterval(() => {
             void registration.update();
           }, 60 * 60 * 1000);
         }
       },
     });
+
     return () => {
+      if (updateInterval !== undefined) {
+        window.clearInterval(updateInterval);
+      }
       void updateSW;
     };
   }, []);
@@ -32,51 +31,34 @@ export default function TaraNotificationManager() {
   useEffect(() => {
     let active = true;
 
-    const runSync = async () => {
-      if (!active) return;
+    const syncExistingPermission = async () => {
+      if (!active || getNotificationPermissionState() !== 'granted') return;
       try {
-        await evaluateDailyAndHolidayNotification();
-        const [customItems, events, berita] = await Promise.all([
-          fetchCustomNotifications(false),
-          fetchEvents(),
-          fetchBerita(),
-        ]);
-        if (!active) return;
-        await syncCustomTaraNotifications(customItems);
-        await syncNewContentNotifications({ events, berita });
-      } catch {
-        // ignore transient network errors
+        await ensureTaraPushSubscription();
+      } catch (error) {
+        // Retry the subscription the next time the user returns to the app.
+        console.warn('TARA background push subscription sync failed:', error);
       }
     };
 
     const initialTimer = window.setTimeout(() => {
-      void runSync();
-    }, 1800);
+      void syncExistingPermission();
+    }, 1200);
 
-    const intervalId = window.setInterval(() => {
-      void runSync();
-    }, 5 * 60 * 1000);
-
-    const handleVisibilityOrFocus = () => {
+    const handleFocus = () => {
       if (document.visibilityState === 'visible') {
-        void runSync();
+        void syncExistingPermission();
       }
     };
 
-    window.addEventListener('focus', handleVisibilityOrFocus);
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
-
-    const unsub = subscribeToTableChanges(['custom_notifications', 'events', 'berita'], () => {
-      void runSync();
-    });
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
 
     return () => {
       active = false;
       window.clearTimeout(initialTimer);
-      window.clearInterval(intervalId);
-      window.removeEventListener('focus', handleVisibilityOrFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
-      unsub();
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
     };
   }, []);
 
