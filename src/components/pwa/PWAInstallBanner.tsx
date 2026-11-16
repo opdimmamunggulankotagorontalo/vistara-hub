@@ -8,6 +8,7 @@ import {
   requestTaraNotificationPermission,
   setNotifBannerDismissed,
   TARA_NOTIF_ICON,
+  showTaraNotification,
 } from '../../services/taraNotifications';
 
 const PWA_BANNER_DISMISSED_KEY = 'vistara_pwa_banner_dismissed_at_v1';
@@ -104,9 +105,19 @@ export function PWAInstallBanner() {
     try {
       const next = await requestTaraNotificationPermission();
       setNotifPerm(next);
+      if (next === 'granted') {
+        await showTaraNotification({
+          title: 'Notifikasi TARA Aktif!',
+          body: 'TARA siap menyapa dengan info agenda, berita, dan pesan resmi OPDIM VISTARA.',
+          tag: 'tara-welcome',
+          targetPath: '/beranda',
+        });
+      }
       if (next !== 'default') {
         setNotifDismissed(true);
       }
+    } catch (error) {
+      console.error('Gagal mengaktifkan push notification TARA:', error);
     } finally {
       setIsRequestingNotif(false);
     }
