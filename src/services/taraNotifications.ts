@@ -3,6 +3,82 @@ import type { BeritaItem, CustomNotificationItem, EventItem } from '../types';
 export const TARA_NOTIF_ICON = '/tara-notif-icon.png';
 export const TARA_NOTIF_BADGE = '/pwa-192x192.png';
 
+const TARA_VAPID_PUBLIC_KEY =
+  'BF51xr9J70q_iPwZvrQk9pbaO_xmR1orkiomC1NwkTneVqZng_wbgb9BntjCaTVQ37jtr563UbqZO6nstQcW-Dc';
+
+function base64UrlToUint8Array(value: string): Uint8Array {
+  const padding = '='.repeat((4 - (value.length % 4)) % 4);
+  const normalized = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(normalized);
+  return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+}
+
+async function callTaraPushApi(
+  action: string,
+  payload: Record<string, unknown> = {}
+): Promise<unknown> {
+  const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/\\/+$/, '');
+  const apiKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+  if (!baseUrl || !apiKey) {
+    throw new Error('Konfigurasi layanan notifikasi VISTARA belum tersedia.');
+  }
+
+  const response = await fetch(`${baseUrl}/functions/v1/tara-push`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: apiKey,
+    },
+    body: JSON.stringify({ action, ...payload }),
+  });
+
+  const result = await response.json().catch(() => ({})) as { error?: string };
+  if (!response.ok) {
+    throw new Error(result.error || 'Layanan notifikasi TARA tidak dapat dihubungi.');
+  }
+  return result;
+}
+
+/**
+ * Registers this browser/PWA installation with the Web Push service.
+ * Must be called after the user has granted Notification permission.
+ */
+export async function ensureTaraPushSubscription(): Promise<boolean> {
+  if (
+    typeof window === 'undefined' ||
+    !('serviceWorker' in navigator) ||
+    !('PushManager' in window) ||
+    !('Notification' in window) ||
+    Notification.permission !== 'granted'
+  ) {
+    return false;
+  }
+
+  const registration = await navigator.serviceWorker.ready;
+  let subscription = await registration.pushManager.getSubscription();
+
+  if (!subscription) {
+    const applicationServerKey = base64UrlToUint8Array(TARA_VAPID_PUBLIC_KEY);
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: applicationServerKey as BufferSource,
+    });
+  }
+
+  await callTaraPushApi('subscribe', { subscription: subscription.toJSON() });
+  return true;
+}
+
+export async function unsubscribeTaraPush(): Promise<void> {
+  if (!('serviceWorker' in navigator)) return;
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.getSubscription();
+  if (!subscription) return;
+
+  await callTaraPushApi('unsubscribe', { endpoint: subscription.endpoint });
+  await subscription.unsubscribe();
+}
+
 const STORAGE_KEYS = {
   lastDailyDate: 'vistara_tara_last_daily_date_v1',
   lastDailyIndex: 'vistara_tara_last_daily_idx_v1',
@@ -143,12 +219,7 @@ export async function requestTaraNotificationPermission(): Promise<NotificationP
   }
   const result = await Notification.requestPermission();
   if (result === 'granted') {
-    await showTaraNotification({
-      title: 'Notifikasi TARA Aktif!',
-      body: 'Halo! TARA siap menyapa dengan semangat harian, info event, berita baru, dan pesan dari pengurus OPDIM VISTARA.',
-      tag: 'tara-welcome',
-      targetPath: '/beranda',
-    });
+    await ensureTaraPushSubscription();
   }
   return result;
 }
